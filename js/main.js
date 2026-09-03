@@ -27,21 +27,38 @@ document.addEventListener("DOMContentLoaded", () => {
 
   dropdownItems.forEach(li => {
     const trigger = li.querySelector(".nav-link");
-    li.addEventListener("mouseenter", () => {
+    let closeTimer = null;
+
+    /* There's a visual gap between the nav link and the mega-menu
+       panel below it (see .mega-menu's "top" offset in style.css).
+       Closing the instant the pointer leaves the link would close
+       the menu while the pointer is still crossing that gap, before
+       it ever reaches the links inside. So we wait briefly before
+       closing, and cancel that close if the pointer comes back
+       (either onto the link again, or into the panel itself, since
+       the panel is a DOM child of this <li>). */
+    function openNow() {
+      clearTimeout(closeTimer);
       closeAllDropdowns();
       li.classList.add("open");
       trigger?.setAttribute("aria-expanded", "true");
-    });
-    li.addEventListener("mouseleave", () => {
-      li.classList.remove("open");
-      trigger?.setAttribute("aria-expanded", "false");
-    });
+    }
+    function closeSoon() {
+      clearTimeout(closeTimer);
+      closeTimer = setTimeout(() => {
+        li.classList.remove("open");
+        trigger?.setAttribute("aria-expanded", "false");
+      }, 300);
+    }
+
+    li.addEventListener("mouseenter", openNow);
+    li.addEventListener("mouseleave", closeSoon);
     trigger?.addEventListener("click", (e) => {
       if (trigger.getAttribute("aria-haspopup") !== "true") return;
       e.preventDefault();
       const isOpen = li.classList.contains("open");
       closeAllDropdowns();
-      if (!isOpen) { li.classList.add("open"); trigger.setAttribute("aria-expanded", "true"); }
+      if (!isOpen) { openNow(); }
     });
   });
 
