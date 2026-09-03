@@ -273,6 +273,10 @@ textarea:focus-visible {
   z-index: 60;
   background: var(--blanc);
   border-bottom: 1px solid var(--line);
+  /* The mega-menu positions itself against this element (sticky counts
+     as positioned), which is how it spans the full width of the page.
+     overflow must stay visible or the panel would be clipped. */
+  overflow: visible;
 }
 
 .nav-wrap {
@@ -392,13 +396,13 @@ textarea:focus-visible {
   margin: 0 auto;
   padding: 0 40px;
   display: grid;
-  grid-template-columns: 340px 1fr;
-  gap: 56px;
+  grid-template-columns: minmax(240px, 300px) 1fr;
+  gap: 52px;
   align-items: start;
 }
 
-.mega-feature { display: block; position: relative; }
-.mega-feature .placeholder-block { aspect-ratio: 4 / 3; min-height: 0; }
+.mega-feature { display: block; position: relative; min-width: 0; }
+.mega-feature .placeholder-block { aspect-ratio: 4 / 3; min-height: 0; width: 100%; }
 .mega-feature-label {
   position: absolute;
   left: 20px;
@@ -410,24 +414,29 @@ textarea:focus-visible {
 }
 .mega-feature:hover .mega-feature-label { color: var(--champagne); }
 
+/* Five columns, matching the Hermès layout. min-width:0 stops long
+   link text from forcing a column wider than its share and pushing
+   the panel out past the edge of the page. */
 .mega-cols {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 40px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 28px;
+  min-width: 0;
 }
 
+.mega-col { min-width: 0; }
 .mega-col h5 {
   font-family: var(--font-body);
   font-size: 0.72rem;
   letter-spacing: 0.09em;
-  color: var(--beton);
-  font-weight: 400;
+  color: var(--umber);
+  font-weight: 500;
   margin-bottom: 18px;
   padding-bottom: 12px;
   border-bottom: 1px solid var(--line-soft);
 }
 .mega-col ul li { margin-bottom: 13px; }
-.mega-col ul li a { font-size: 0.93rem; }
+.mega-col ul li a { font-size: 0.9rem; }
 .mega-col ul li a:hover { color: var(--chai); }
 
 /* -----------------------------------------------------------------
@@ -986,6 +995,7 @@ site-footer, .site-footer { display: block; background: var(--blanc); }
 @media (max-width: 1080px) {
   .mega-inner { grid-template-columns: 1fr; gap: 32px; }
   .mega-feature { display: none; }
+  .mega-cols { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px 20px; }
   .product-grid { grid-template-columns: repeat(3, 1fr); }
   .footer-columns { grid-template-columns: 1fr 1fr 1fr; }
   .footer-brand { grid-column: 1 / -1; margin-bottom: 10px; }
