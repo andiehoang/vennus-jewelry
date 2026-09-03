@@ -295,7 +295,10 @@ textarea:focus-visible {
   gap: 28px;
 }
 
-.primary-nav > li { position: relative; }
+/* Nav items are intentionally NOT position:relative — the mega-menu
+   must position itself against .site-header (which is sticky, and so
+   acts as the containing block) in order to span full width. */
+.primary-nav > li { position: static; }
 
 .nav-link {
   font-size: 0.86rem;
@@ -353,54 +356,79 @@ textarea:focus-visible {
 .hamburger span { display: block; height: 1px; background: var(--umber); width: 100%; }
 
 /* -----------------------------------------------------------------
-   6. MEGA MENU DROPDOWN
+   6. MEGA MENU DROPDOWN (Hermès-style)
+   The panel spans the full width of the header and sits FLUSH
+   against its bottom edge (top: 100%), so there is no gap for the
+   pointer to cross on the way down. This is what lets you move
+   from the nav link into the menu without it closing.
    ----------------------------------------------------------------- */
 .mega-menu {
   position: absolute;
-  top: calc(100% + 22px);
-  left: 50%;
-  transform: translateX(-50%) translateY(-8px);
-  width: min(880px, 92vw);
+  top: 100%;
+  left: 0;
+  right: 0;
+  width: 100%;
   background: var(--blanc);
-  border: 1px solid var(--line);
-  box-shadow: var(--shadow-soft);
-  padding: 44px 48px;
-  display: none;
-  grid-template-columns: 1fr 1fr 1.1fr;
-  gap: 40px;
-  z-index: 50;
+  border-top: 1px solid var(--line);
+  box-shadow: 0 14px 30px rgba(59, 44, 32, 0.08);
+  padding: 46px 0 54px;
+  z-index: 55;
   opacity: 0;
-  transition: opacity 0.2s var(--ease), transform 0.2s var(--ease);
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(-6px);
+  transition: opacity 0.22s var(--ease), transform 0.22s var(--ease), visibility 0.22s;
 }
 
-.primary-nav li.open .mega-menu {
-  display: grid;
+.primary-nav li.open > .mega-menu {
   opacity: 1;
-  transform: translateX(-50%) translateY(0);
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.mega-inner {
+  max-width: var(--container-max);
+  margin: 0 auto;
+  padding: 0 40px;
+  display: grid;
+  grid-template-columns: 340px 1fr;
+  gap: 56px;
+  align-items: start;
+}
+
+.mega-feature { display: block; position: relative; }
+.mega-feature .placeholder-block { aspect-ratio: 4 / 3; min-height: 0; }
+.mega-feature-label {
+  position: absolute;
+  left: 20px;
+  bottom: 18px;
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  color: var(--blanc);
+  text-shadow: 0 1px 6px rgba(0,0,0,0.4);
+}
+.mega-feature:hover .mega-feature-label { color: var(--champagne); }
+
+.mega-cols {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 40px;
 }
 
 .mega-col h5 {
   font-family: var(--font-body);
   font-size: 0.72rem;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.09em;
   color: var(--beton);
-  margin-bottom: 16px;
+  font-weight: 400;
+  margin-bottom: 18px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line-soft);
 }
-.mega-col ul li { margin-bottom: 11px; }
-.mega-col ul li a { font-size: 0.92rem; }
+.mega-col ul li { margin-bottom: 13px; }
+.mega-col ul li a { font-size: 0.93rem; }
 .mega-col ul li a:hover { color: var(--chai); }
-
-.mega-feature {
-  background: var(--craie);
-  padding: 26px;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  min-height: 220px;
-}
-.mega-feature .placeholder-block { flex: 1; margin-bottom: 16px; }
-.mega-feature h6 { font-family: var(--font-display); font-size: 1.2rem; font-weight: 500; margin-bottom: 6px; }
-.mega-feature a { font-size: 0.8rem; border-bottom: 1px solid var(--umber); padding-bottom: 2px; }
 
 /* -----------------------------------------------------------------
    7. SEARCH OVERLAY
@@ -956,6 +984,8 @@ site-footer, .site-footer { display: block; background: var(--blanc); }
    17. RESPONSIVE
    ----------------------------------------------------------------- */
 @media (max-width: 1080px) {
+  .mega-inner { grid-template-columns: 1fr; gap: 32px; }
+  .mega-feature { display: none; }
   .product-grid { grid-template-columns: repeat(3, 1fr); }
   .footer-columns { grid-template-columns: 1fr 1fr 1fr; }
   .footer-brand { grid-column: 1 / -1; margin-bottom: 10px; }

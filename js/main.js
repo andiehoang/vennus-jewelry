@@ -14,57 +14,79 @@ document.addEventListener("DOMContentLoaded", () => {
   if (yearEl) yearEl.textContent = new Date().getFullYear();
 
   /* ---------------------------------------------------------------
-     MEGA MENU DROPDOWNS
+     MEGA MENU DROPDOWNS (Hermès-style behaviour)
+     The panel is flush against the bottom of the header, so moving
+     the pointer down into it never crosses a gap. On top of that:
+       - Clicking a category opens the panel and PINS it open, so it
+         stays put while you read and click a link inside.
+       - Hovering opens it too, with a short grace period before it
+         closes, so a wobbly mouse path doesn't dismiss it.
+       - It closes on Escape, on a click outside the header, or when
+         you open a different category.
      --------------------------------------------------------------- */
   const dropdownItems = document.querySelectorAll(".primary-nav li.has-dropdown");
+  let pinnedItem = null;
+  let closeTimer = null;
 
   function closeAllDropdowns() {
+    clearTimeout(closeTimer);
+    pinnedItem = null;
     dropdownItems.forEach(li => {
       li.classList.remove("open");
       li.querySelector(".nav-link")?.setAttribute("aria-expanded", "false");
     });
   }
 
+  function openItem(li) {
+    clearTimeout(closeTimer);
+    dropdownItems.forEach(other => {
+      if (other !== li) {
+        other.classList.remove("open");
+        other.querySelector(".nav-link")?.setAttribute("aria-expanded", "false");
+      }
+    });
+    li.classList.add("open");
+    li.querySelector(".nav-link")?.setAttribute("aria-expanded", "true");
+  }
+
   dropdownItems.forEach(li => {
     const trigger = li.querySelector(".nav-link");
-    let closeTimer = null;
+    const panel = li.querySelector(".mega-menu");
 
-    /* There's a visual gap between the nav link and the mega-menu
-       panel below it (see .mega-menu's "top" offset in style.css).
-       Closing the instant the pointer leaves the link would close
-       the menu while the pointer is still crossing that gap, before
-       it ever reaches the links inside. So we wait briefly before
-       closing, and cancel that close if the pointer comes back
-       (either onto the link again, or into the panel itself, since
-       the panel is a DOM child of this <li>). */
-    function openNow() {
+    /* Click = open and pin. Clicking the same category again closes it. */
+    trigger?.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (pinnedItem === li && li.classList.contains("open")) {
+        closeAllDropdowns();
+      } else {
+        openItem(li);
+        pinnedItem = li;
+      }
+    });
+
+    /* Hover opens as well, but never un-pins a click-opened panel. */
+    li.addEventListener("mouseenter", () => {
       clearTimeout(closeTimer);
-      closeAllDropdowns();
-      li.classList.add("open");
-      trigger?.setAttribute("aria-expanded", "true");
-    }
-    function closeSoon() {
+      if (!pinnedItem) openItem(li);
+    });
+    li.addEventListener("mouseleave", () => {
+      if (pinnedItem === li) return;   // pinned open by a click — leave it
       clearTimeout(closeTimer);
       closeTimer = setTimeout(() => {
         li.classList.remove("open");
         trigger?.setAttribute("aria-expanded", "false");
-      }, 300);
-    }
-
-    li.addEventListener("mouseenter", openNow);
-    li.addEventListener("mouseleave", closeSoon);
-    trigger?.addEventListener("click", (e) => {
-      if (trigger.getAttribute("aria-haspopup") !== "true") return;
-      e.preventDefault();
-      const isOpen = li.classList.contains("open");
-      closeAllDropdowns();
-      if (!isOpen) { openNow(); }
+      }, 260);
     });
+
+    /* Clicks inside the panel must not bubble up to the
+       close-on-click-outside handler before the link navigates. */
+    panel?.addEventListener("click", (e) => e.stopPropagation());
   });
 
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeAllDropdowns(); });
   document.addEventListener("click", (e) => {
-    if (!e.target.closest(".primary-nav")) closeAllDropdowns();
+    if (!e.target.closest(".site-header")) closeAllDropdowns();
   });
 
   /* ---------------------------------------------------------------
