@@ -14,6 +14,28 @@ document.addEventListener("DOMContentLoaded", () => {
   if (yearEl) yearEl.textContent = new Date().getFullYear();
 
   /* ---------------------------------------------------------------
+     TRANSPARENT HEADER OVER THE HERO
+     Measures the real header height (so the hero can be pulled up
+     behind it by exactly the right amount, at any screen size) and
+     fades the bar to solid once the page is scrolled.
+     --------------------------------------------------------------- */
+  const siteHeader = document.querySelector(".site-header");
+
+  function syncHeaderHeight() {
+    if (!siteHeader) return;
+    document.documentElement.style.setProperty("--header-h", siteHeader.offsetHeight + "px");
+  }
+  syncHeaderHeight();
+  window.addEventListener("resize", syncHeaderHeight);
+
+  function syncHeaderSolid() {
+    if (!siteHeader) return;
+    siteHeader.classList.toggle("is-solid", window.scrollY > 40);
+  }
+  syncHeaderSolid();
+  window.addEventListener("scroll", syncHeaderSolid, { passive: true });
+
+  /* ---------------------------------------------------------------
      MEGA MENU DROPDOWNS (Hermès-style behaviour)
      The panel is flush against the bottom of the header, so moving
      the pointer down into it never crosses a gap. On top of that:
@@ -35,6 +57,8 @@ document.addEventListener("DOMContentLoaded", () => {
       li.classList.remove("open");
       li.querySelector(".nav-link")?.setAttribute("aria-expanded", "false");
     });
+    /* Let the bar go back to transparent over the hero */
+    siteHeader?.classList.remove("menu-open");
   }
 
   function openItem(li) {
@@ -47,6 +71,8 @@ document.addEventListener("DOMContentLoaded", () => {
     });
     li.classList.add("open");
     li.querySelector(".nav-link")?.setAttribute("aria-expanded", "true");
+    /* A see-through bar above an open panel looks broken, so make it solid */
+    siteHeader?.classList.add("menu-open");
   }
 
   dropdownItems.forEach(li => {
@@ -76,6 +102,9 @@ document.addEventListener("DOMContentLoaded", () => {
       closeTimer = setTimeout(() => {
         li.classList.remove("open");
         trigger?.setAttribute("aria-expanded", "false");
+        if (!document.querySelector(".primary-nav li.has-dropdown.open")) {
+          siteHeader?.classList.remove("menu-open");
+        }
       }, 260);
     });
 

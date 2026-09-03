@@ -273,10 +273,49 @@ textarea:focus-visible {
   z-index: 60;
   background: var(--blanc);
   border-bottom: 1px solid var(--line);
+  transition: background 0.35s var(--ease), border-color 0.35s var(--ease);
   /* The mega-menu positions itself against this element (sticky counts
      as positioned), which is how it spans the full width of the page.
      overflow must stay visible or the panel would be clipped. */
   overflow: visible;
+}
+
+/* -----------------------------------------------------------------
+   TRANSPARENT HEADER OVER THE HERO
+   Pages that open with a hero image/video carry class="hero-page" on
+   <body>. The hero is pulled up underneath the nav so the media runs
+   edge to edge behind it, and the bar itself is see-through until you
+   scroll — at which point it fades to solid so the links stay legible.
+   ----------------------------------------------------------------- */
+body.hero-page .site-header {
+  background: transparent;
+  border-bottom-color: transparent;
+}
+
+body.hero-page .hero {
+  margin-top: calc(-1 * var(--header-h, 78px));
+}
+
+/* Solid again once scrolled, or while a mega-menu is open */
+body.hero-page .site-header.is-solid,
+body.hero-page .site-header.menu-open {
+  background: var(--blanc);
+  border-bottom-color: var(--line);
+}
+
+/* OPTIONAL: if your hero image or video is DARK, add class
+   "header-light" alongside "hero-page" on <body> and the nav will
+   switch to cream text so it stays readable over the footage.
+   e.g. <body class="hero-page header-light"> */
+body.hero-page.header-light .site-header:not(.is-solid):not(.menu-open) .nav-link,
+body.hero-page.header-light .site-header:not(.is-solid):not(.menu-open) .logo {
+  color: var(--blanc);
+}
+body.hero-page.header-light .site-header:not(.is-solid):not(.menu-open) .icon-btn svg {
+  stroke: var(--blanc);
+}
+body.hero-page.header-light .site-header:not(.is-solid):not(.menu-open) .hamburger span {
+  background: var(--blanc);
 }
 
 .nav-wrap {
