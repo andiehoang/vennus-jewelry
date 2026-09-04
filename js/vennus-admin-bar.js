@@ -113,6 +113,17 @@
         cursor: pointer; font-size: .85rem; text-decoration: none; padding: 0;
       }
       .vn-edit-pencil:hover { background: #232019; }
+      /* Editorial/hero/mega-menu images anchor their own captions and CTAs
+         to the bottom-left, so this pencil goes top-right instead, which
+         stays clear on every one of them. */
+      .vn-edit-pencil-top {
+        position: absolute; top: 10px; right: 10px; z-index: 20;
+        width: 32px; height: 32px; background: rgba(35,32,25,.9); color: #F3EDE3;
+        border: none; display: flex; align-items: center; justify-content: center;
+        cursor: pointer; font-size: .9rem; text-decoration: none; padding: 0;
+        box-shadow: 0 2px 8px rgba(0,0,0,.25);
+      }
+      .vn-edit-pencil-top:hover { background: #232019; }
 
       .vn-modal { position: fixed; inset: 0; background: rgba(35,26,18,.5); z-index: 500;
         display: flex; align-items: center; justify-content: center; padding: 20px; overflow-y: auto; }
@@ -267,11 +278,11 @@
 
   function scanEditableImages() {
     document.querySelectorAll("[data-editable-image]").forEach(el => {
-      if (el.querySelector(":scope > .vn-edit-pencil")) return;
+      if (el.querySelector(":scope > .vn-edit-pencil-top")) return;
       if (getComputedStyle(el).position === "static") el.style.position = "relative";
       const btn = document.createElement("button");
       btn.type = "button";
-      btn.className = "vn-edit-pencil";
+      btn.className = "vn-edit-pencil-top";
       btn.title = "Edit this image";
       btn.textContent = "✎";
       btn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); openImageEditor(el); });
