@@ -24,6 +24,11 @@ function productCardHTML(p) {
     ? `<span class="was">${vennusFormatPrice(p.compareAt)}</span>${vennusFormatPrice(p.price)}`
     : vennusFormatPrice(p.price);
 
+  // Real photo if one's been uploaded in the admin; placeholder otherwise.
+  const media = (p.images && p.images.length)
+    ? `<img src="${p.images[0]}" alt="${p.name}" loading="lazy" style="position:absolute; inset:0; width:100%; height:100%; object-fit:cover;">`
+    : `<div class="placeholder-block" aria-hidden="true"><span class="placeholder-label">Photo — ${p.name}</span></div>`;
+
   return `
     <div class="product-card" data-category="${p.category}">
       <a href="product.html?id=${p.id}" class="card-link">
@@ -32,9 +37,7 @@ function productCardHTML(p) {
           <button type="button" class="wishlist-btn" aria-label="Add ${p.name} to wishlist" data-wishlist>
             <svg viewBox="0 0 24 24"><path d="M12 20s-7-4.4-9.5-8.8C.8 7.8 2.6 4.5 6 4c2-.3 3.7.8 6 3 2.3-2.2 4-3.3 6-3 3.4.5 5.2 3.8 3.5 7.2C19 15.6 12 20 12 20z" fill="none"/></svg>
           </button>
-          <div class="placeholder-block" aria-hidden="true">
-            <span class="placeholder-label">Photo — ${p.name}</span>
-          </div>
+          ${media}
         </div>
         <div class="product-info">
           <h3>${p.name}</h3>
@@ -127,17 +130,38 @@ function renderProductDetail() {
   const detailsList = document.getElementById("pdpDetailsList");
   detailsList.innerHTML = product.details.map(d => `<li>${d}</li>`).join("");
 
-  /* Gallery */
+  /* Gallery — real uploaded photos if any exist, placeholders otherwise */
   const galleryMain = document.getElementById("pdpGalleryMain");
-  galleryMain.innerHTML = `<div class="placeholder-block" aria-hidden="true"><span class="placeholder-label">Main photo — ${product.name}</span></div>`;
-  const thumbCount = Math.max(1, Math.min(product.images || 3, 4));
-  const thumbsWrap = document.getElementById("pdpGalleryThumbs");
-  thumbsWrap.innerHTML = Array.from({ length: thumbCount }).map((_, i) =>
-    `<div class="placeholder-block" data-thumb aria-hidden="true"><span class="placeholder-label">${i + 1}</span></div>`
-  ).join("");
-  thumbsWrap.querySelectorAll("[data-thumb]").forEach(thumb => {
+  const galleryThumbs = document.getElementById("pdpGalleryThumbs");
+  const photos = product.images && product.images.length ? product.images : null;
+
+  function mainPhotoHTML(src, label) {
+    return src
+      ? `<img src="${src}" alt="${product.name}" style="width:100%; height:100%; object-fit:cover;">`
+      : `<div class="placeholder-block" aria-hidden="true"><span class="placeholder-label">${label}</span></div>`;
+  }
+
+  galleryMain.innerHTML = mainPhotoHTML(photos ? photos[0] : null, `Main photo — ${product.name}`);
+
+  if (photos) {
+    galleryThumbs.innerHTML = photos.map((src, i) =>
+      `<div class="placeholder-block" data-thumb data-src="${src}" style="padding:0; overflow:hidden;">
+        <img src="${src}" alt="View ${i + 1}" style="width:100%; height:100%; object-fit:cover;">
+      </div>`
+    ).join("");
+  } else {
+    const thumbCount = Math.max(1, Math.min(product.images || 3, 4));
+    galleryThumbs.innerHTML = Array.from({ length: thumbCount }).map((_, i) =>
+      `<div class="placeholder-block" data-thumb aria-hidden="true"><span class="placeholder-label">${i + 1}</span></div>`
+    ).join("");
+  }
+
+  galleryThumbs.querySelectorAll("[data-thumb]").forEach(thumb => {
     thumb.addEventListener("click", () => {
-      galleryMain.innerHTML = `<div class="placeholder-block" aria-hidden="true"><span class="placeholder-label">${thumb.querySelector(".placeholder-label").textContent} — ${product.name}</span></div>`;
+      const src = thumb.dataset.src;
+      galleryMain.innerHTML = src
+        ? mainPhotoHTML(src)
+        : `<div class="placeholder-block" aria-hidden="true"><span class="placeholder-label">${thumb.querySelector(".placeholder-label").textContent} — ${product.name}</span></div>`;
     });
   });
 
