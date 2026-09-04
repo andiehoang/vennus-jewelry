@@ -57,7 +57,7 @@ document.addEventListener("click", (e) => {
 /* ---------------------------------------------------------------
    SHOP GRID (shop.html)
    --------------------------------------------------------------- */
-(function renderShopGrid() {
+function renderShopGrid() {
   const grid = document.getElementById("productGrid");
   if (!grid) return;
 
@@ -88,7 +88,7 @@ document.addEventListener("click", (e) => {
       card.style.display = card.dataset.category === category ? "" : "none";
     });
   }
-})();
+}
 
 /* ---------------------------------------------------------------
    FEATURED PRODUCTS (index.html)
@@ -99,13 +99,11 @@ function renderFeaturedProducts(containerId, filterFn, limit) {
   const items = VENNUS_PRODUCTS.filter(filterFn).slice(0, limit || 4);
   container.innerHTML = items.map(productCardHTML).join("");
 }
-renderFeaturedProducts("newArrivalsGrid", p => p.tag === "new", 4);
-renderFeaturedProducts("bestsellersGrid", p => p.tag === "bestseller" || p.tag === "sale", 4);
 
 /* ---------------------------------------------------------------
    PRODUCT DETAIL PAGE (product.html)
    --------------------------------------------------------------- */
-(function renderProductDetail() {
+function renderProductDetail() {
   const root = document.getElementById("productDetailRoot");
   if (!root) return;
 
@@ -201,4 +199,37 @@ renderFeaturedProducts("bestsellersGrid", p => p.tag === "bestseller" || p.tag =
   const related = VENNUS_PRODUCTS.filter(p => p.category === product.category && p.id !== product.id).slice(0, 4);
   const relatedGrid = document.getElementById("relatedGrid");
   if (relatedGrid) relatedGrid.innerHTML = related.map(productCardHTML).join("");
-})();
+}
+
+/* ---------------------------------------------------------------
+   BOOT
+   -----------------------------------------------------------------
+   If js/vennus-api.js is loaded before this file (see the storefront
+   connector), it starts fetching your live catalogue immediately and
+   exposes that fetch as window.vennusReady — a promise. We wait for
+   it here before drawing anything, so the page renders once, with
+   final data, instead of flashing the sample catalogue first.
+
+   The 2.5s timeout matters: free-tier backends fall asleep after
+   inactivity and can take several seconds to wake up. Rather than
+   leave the page blank while that happens, we give it a short grace
+   period and then render with whatever we have — the bundled sample
+   data if the fetch hasn't resolved yet. Nobody should stare at a
+   blank shop because a server was napping.
+
+   Without vennus-api.js loaded at all, window.vennusReady is simply
+   undefined and everything renders immediately, exactly as before.
+   --------------------------------------------------------------- */
+async function vennusBootRender() {
+  if (window.vennusReady) {
+    await Promise.race([
+      window.vennusReady,
+      new Promise(resolve => setTimeout(resolve, 2500))
+    ]).catch(() => { /* connector failed — fall back to bundled products.js */ });
+  }
+  renderShopGrid();
+  renderFeaturedProducts("newArrivalsGrid", p => p.tag === "new", 4);
+  renderFeaturedProducts("bestsellersGrid", p => p.tag === "bestseller" || p.tag === "sale", 4);
+  renderProductDetail();
+}
+vennusBootRender();
