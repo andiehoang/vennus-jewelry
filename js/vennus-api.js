@@ -94,15 +94,17 @@ async function vennusLoadCatalogue() {
     window.vennusApplyEditableImage = function (el, media) {
       if (!el || !media || !media.url) return;
       const position = media.position || "center center";
-      // The admin bar may have already attached its edit pencil to this
+      const zoom = media.zoom && media.zoom !== 1 ? media.zoom : null;
+      const extra = zoom ? ` transform: scale(${zoom}); transform-origin: ${position};` : "";
+      // The admin bar may have already attached its edit button to this
       // element before this runs (or vice versa) — timing between two
-      // independent scripts isn't guaranteed. Preserve the pencil across
+      // independent scripts isn't guaranteed. Preserve the button across
       // the innerHTML replacement rather than letting whichever runs
       // second silently erase the other's work.
       const pencil = el.querySelector(":scope > .vn-edit-btn");
       el.innerHTML = media.type === "video"
-        ? `<video autoplay muted loop playsinline style="width:100%; height:100%; object-fit:cover; object-position:${position}; display:block;"><source src="${media.url}"></video>`
-        : `<img src="${media.url}" alt="" style="width:100%; height:100%; object-fit:cover; object-position:${position}; display:block;">`;
+        ? `<video autoplay muted loop playsinline style="width:100%; height:100%; object-fit:cover; object-position:${position}; display:block;${extra}"><source src="${media.url}"></video>`
+        : `<img src="${media.url}" alt="" style="width:100%; height:100%; object-fit:cover; object-position:${position}; display:block;${extra}">`;
       if (pencil) el.appendChild(pencil);
     };
     document.querySelectorAll("[data-editable-image]").forEach(el => {

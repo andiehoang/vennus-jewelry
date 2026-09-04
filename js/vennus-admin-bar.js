@@ -139,11 +139,21 @@
       .vn-media-pick div:hover { border-color: #B8865A; }
       .vn-media-pick img, .vn-media-pick video { width: 100%; height: 100%; object-fit: cover; }
 
-      .vn-position-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; width: 130px; margin-top: 6px; }
-      .vn-position-grid button { aspect-ratio: 1; border: 1px solid #C9AC80; background: #fff; cursor: pointer; padding: 0; }
-      .vn-position-grid button.active { background: #3B2C20; }
-      .vn-preview-frame { width: 100%; aspect-ratio: 16/9; background: #EDE3D3; overflow: hidden; margin-top: 12px; }
-      .vn-preview-frame img, .vn-preview-frame video { width: 100%; height: 100%; object-fit: cover; }
+      .vn-crop-frame {
+        width: 100%; aspect-ratio: 16/9; background: #EDE3D3; overflow: hidden;
+        margin-top: 12px; position: relative; cursor: grab; user-select: none; touch-action: none;
+      }
+      .vn-crop-frame.dragging { cursor: grabbing; }
+      .vn-crop-frame img, .vn-crop-frame video {
+        position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none;
+      }
+      .vn-crop-controls { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+      .vn-crop-controls button.vn-zoom-btn {
+        width: 30px; height: 30px; border: 1px solid #3B2C20; background: none; color: #3B2C20;
+        font-size: 1rem; cursor: pointer; padding: 0; font-family: inherit;
+      }
+      .vn-crop-controls input[type="range"] { flex: 1; }
+      .vn-crop-hint { font-size: .74rem; color: #8D8477; margin-top: 6px; }
 
       .vn-photo-list { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 10px 0; }
       .vn-photo-list .item { position: relative; aspect-ratio: 1; background: #EDE3D3; overflow: hidden; }
@@ -172,15 +182,10 @@
     zone.addEventListener("drop", e => onFiles(e.dataTransfer.files));
   }
 
-  const POSITIONS = [
-    ["top left","left top"], ["top center","center top"], ["top right","right top"],
-    ["center left","left center"], ["center center","center center"], ["center right","right center"],
-    ["bottom left","left bottom"], ["bottom center","center bottom"], ["bottom right","right bottom"]
-  ];
-
   /* =================================================================
      SINGLE-IMAGE EDITOR — used for every [data-editable-image] spot
-     (hero banners, editorial photos, mega-menu features).
+     (hero banners, editorial photos, mega-menu features). Framing is
+     real drag-to-pan / scroll-to-zoom, not a fixed set of positions.
      ================================================================= */
   async function openImageEditor(el) {
     const key = el.dataset.editableImage;
@@ -199,38 +204,102 @@
         <label style="text-decoration:underline; cursor:pointer;">choose a file<input type="file" id="vnFile" accept="image/*,video/*" style="display:none;"></label>
       </div>
       <div id="vnStep2" style="display:none;">
-        <p style="font-size:.85rem; font-weight:500; margin-top:16px;">How should it sit in the frame?</p>
-        <div class="vn-preview-frame" id="vnPreview"></div>
-        <div class="vn-position-grid" id="vnPosGrid">
-          ${POSITIONS.map(([label, val]) => `<button type="button" data-pos="${val}" title="${label}"></button>`).join("")}
+        <p style="font-size:.85rem; font-weight:500; margin-top:16px;">Drag to reposition, scroll (or use the buttons) to zoom</p>
+        <div class="vn-crop-frame" id="vnCropFrame"></div>
+        <div class="vn-crop-controls">
+          <button type="button" class="vn-zoom-btn" id="vnZoomOut">−</button>
+          <input type="range" id="vnZoomSlider" min="100" max="300" value="100" step="1">
+          <button type="button" class="vn-zoom-btn" id="vnZoomIn">+</button>
         </div>
+        <p class="vn-crop-hint">This is exactly how it will be framed on the site.</p>
         <div class="row">
           <button type="button" class="vn-btn primary" id="vnSaveImage">Save</button>
           <button type="button" class="vn-btn" id="vnCancelStep2">Choose a different file</button>
+          <button type="button" class="vn-btn" id="vnResetCrop">Reset</button>
         </div>
       </div>
     `, {});
 
     let pending = null; // { url, type }
-    let position = "center center";
+    let posX = 50, posY = 50, zoom = 1; // posX/posY in %, zoom 1 = fit, up to 3 = 300%
 
     function showStep2(media) {
       pending = media;
+      posX = 50; posY = 50; zoom = 1;
       overlay.querySelector(".vn-media-pick").style.display = "none";
       overlay.querySelector("#vnDrop").style.display = "none";
       overlay.querySelector("#vnStep2").style.display = "block";
-      renderPreview();
-      overlay.querySelectorAll("#vnPosGrid button").forEach(b => {
-        b.classList.toggle("active", b.dataset.pos === position);
-        b.onclick = () => { position = b.dataset.pos; renderPreview(); overlay.querySelectorAll("#vnPosGrid button").forEach(x => x.classList.toggle("active", x === b)); };
-      });
+      overlay.querySelector("#vnZoomSlider").value = 100;
+
+      const frame = overlay.querySelector("#vnCropFrame");
+      // Match the live frame's real aspect ratio so the preview is exact,
+      // not an arbitrary approximation.
+      const liveRatio = el.getBoundingClientRect();
+      if (liveRatio.width > 0 && liveRatio.height > 0) {
+        frame.style.aspectRatio = `${liveRatio.width} / ${liveRatio.height}`;
+      }
+      frame.innerHTML = media.type === "video"
+        ? `<video src="${media.url}" muted loop autoplay playsinline></video>`
+        : `<img src="${media.url}" draggable="false">`;
+      renderTransform();
+      wireCropInteraction(frame);
     }
-    function renderPreview() {
-      const box = overlay.querySelector("#vnPreview");
-      box.innerHTML = pending.type === "video"
-        ? `<video src="${pending.url}" muted style="object-position:${position}"></video>`
-        : `<img src="${pending.url}" style="object-position:${position}">`;
+
+    function renderTransform() {
+      const media = overlay.querySelector("#vnCropFrame img, #vnCropFrame video");
+      if (!media) return;
+      media.style.objectPosition = `${posX}% ${posY}%`;
+      media.style.transform = zoom !== 1 ? `scale(${zoom})` : "";
+      media.style.transformOrigin = `${posX}% ${posY}%`;
+      overlay.querySelector("#vnZoomSlider").value = Math.round(zoom * 100);
     }
+
+    function setZoom(newZoom) {
+      zoom = Math.min(3, Math.max(1, newZoom));
+      renderTransform();
+    }
+
+    function wireCropInteraction(frame) {
+      let dragging = false, lastX = 0, lastY = 0;
+
+      const onDown = (clientX, clientY) => {
+        dragging = true;
+        lastX = clientX; lastY = clientY;
+        frame.classList.add("dragging");
+      };
+      const onMove = (clientX, clientY) => {
+        if (!dragging) return;
+        const rect = frame.getBoundingClientRect();
+        // Convert pixel drag distance into a % shift of object-position.
+        // Dividing by zoom keeps the drag feeling 1:1 with the cursor
+        // regardless of how far zoomed in you are.
+        const dxPct = ((clientX - lastX) / rect.width) * 100 / zoom;
+        const dyPct = ((clientY - lastY) / rect.height) * 100 / zoom;
+        posX = Math.min(100, Math.max(0, posX - dxPct));
+        posY = Math.min(100, Math.max(0, posY - dyPct));
+        lastX = clientX; lastY = clientY;
+        renderTransform();
+      };
+      const onUp = () => { dragging = false; frame.classList.remove("dragging"); };
+
+      frame.addEventListener("mousedown", e => { e.preventDefault(); onDown(e.clientX, e.clientY); });
+      window.addEventListener("mousemove", e => onMove(e.clientX, e.clientY));
+      window.addEventListener("mouseup", onUp);
+
+      frame.addEventListener("touchstart", e => { const t = e.touches[0]; onDown(t.clientX, t.clientY); }, { passive: true });
+      frame.addEventListener("touchmove", e => { const t = e.touches[0]; onMove(t.clientX, t.clientY); }, { passive: true });
+      frame.addEventListener("touchend", onUp);
+
+      frame.addEventListener("wheel", e => {
+        e.preventDefault();
+        setZoom(zoom - e.deltaY * 0.0015);
+      }, { passive: false });
+    }
+
+    overlay.querySelector("#vnZoomIn").onclick = () => setZoom(zoom + 0.2);
+    overlay.querySelector("#vnZoomOut").onclick = () => setZoom(zoom - 0.2);
+    overlay.querySelector("#vnZoomSlider").addEventListener("input", e => setZoom(e.target.value / 100));
+    overlay.querySelector("#vnResetCrop").onclick = () => { posX = 50; posY = 50; zoom = 1; renderTransform(); };
 
     overlay.querySelectorAll(".vn-media-pick div[data-url]").forEach(div => {
       div.onclick = () => showStep2({ url: div.dataset.url, type: div.dataset.type });
@@ -257,7 +326,7 @@
     };
 
     overlay.querySelector("#vnSaveImage").onclick = async () => {
-      const media = { url: pending.url, type: pending.type, position };
+      const media = { url: pending.url, type: pending.type, position: `${posX}% ${posY}%`, zoom };
       try {
         await adminApi("/settings", { method: "PUT", body: JSON.stringify({ [key]: media }) });
         window.vennusApplyEditableImage(el, media);
