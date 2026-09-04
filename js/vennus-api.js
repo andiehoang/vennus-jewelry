@@ -84,6 +84,24 @@ async function vennusLoadCatalogue() {
       if (link) bar.appendChild(link);
     }
 
+    // Every image/video slot the admin can edit directly on the site —
+    // hero banners, editorial photos, mega-menu features, etc. Each one
+    // is tagged in the HTML with data-editable-image="some_key". This
+    // fills in whichever keys have something saved; untagged elements,
+    // or keys nothing's been set for yet, keep their placeholder box.
+    // Exposed on window so vennus-admin-bar.js can reuse the exact same
+    // rendering after a save, instead of a second, possibly-diverging copy.
+    window.vennusApplyEditableImage = function (el, media) {
+      if (!el || !media || !media.url) return;
+      const position = media.position || "center center";
+      el.innerHTML = media.type === "video"
+        ? `<video autoplay muted loop playsinline style="width:100%; height:100%; object-fit:cover; object-position:${position}; display:block;"><source src="${media.url}"></video>`
+        : `<img src="${media.url}" alt="" style="width:100%; height:100%; object-fit:cover; object-position:${position}; display:block;">`;
+    };
+    document.querySelectorAll("[data-editable-image]").forEach(el => {
+      window.vennusApplyEditableImage(el, s[el.dataset.editableImage]);
+    });
+
     // Theme colours
     if (s.theme) {
       const map = { blanc:"--blanc", craie:"--craie", sand:"--sand", chai:"--chai",
