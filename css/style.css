@@ -1137,6 +1137,13 @@ site-footer, .site-footer { display: block; background: var(--blanc); }
   .editorial-split { grid-template-columns: 1fr; }
   .editorial-copy { padding: var(--gap-lg) 24px; }
   .hero-content { padding: 0 24px 52px; }
+  /* The two CTAs sat side by side with white-space:nowrap, which is
+     fine on desktop but ran the second button off the right edge on
+     a narrow phone (body's overflow-x:hidden was silently clipping
+     it rather than wrapping or scrolling it into view). Stack them
+     instead, each full-width against the hero's own padding. */
+  .hero-actions { flex-direction: column; align-items: stretch; gap: 12px; }
+  .hero-actions .btn { width: 100%; white-space: normal; }
   .product-detail { grid-template-columns: 1fr; gap: var(--gap-lg); }
   .info-layout { grid-template-columns: 1fr; }
   .info-nav { position: static; display: flex; gap: 28px; overflow-x: auto; padding-bottom: 10px; }
