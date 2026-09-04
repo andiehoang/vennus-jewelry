@@ -21,7 +21,7 @@
    Keep category values lowercase and matching the nav exactly.
    ================================================================= */
 
-const VENNUS_PRODUCTS = [
+var VENNUS_PRODUCTS = [
   {
     id: 1,
     name: "Akoya Solitaire Necklace",

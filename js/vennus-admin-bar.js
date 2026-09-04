@@ -183,28 +183,35 @@
   }
 
   /* =================================================================
-     SINGLE-IMAGE EDITOR — used for every [data-editable-image] spot
-     (hero banners, editorial photos, mega-menu features). Framing is
-     real drag-to-pan / scroll-to-zoom, not a fixed set of positions.
+     PICK + CROP — one reusable modal used everywhere a single photo or
+     video needs choosing/uploading and framing: hero banners, editorial
+     photos, mega-menu features, and each individual product photo.
+     Framing is real drag-to-pan / scroll-to-zoom against the exact
+     aspect ratio it will actually render at.
+
+     opts:
+       aspectRatio  — width/height number the crop frame should match
+       existingMedia — { url, type, position, zoom } to jump straight
+                        to the crop step on an already-chosen file
+                        (used when re-framing a photo that's already
+                        part of a product, rather than replacing it)
+       onSave(media) — called with { url, type, position, zoom }
      ================================================================= */
-  async function openImageEditor(el) {
-    const key = el.dataset.editableImage;
+  function openPickCropModal({ aspectRatio, existingMedia, onSave }) {
     let items = [];
-    try { items = await adminApi("/media"); } catch { /* library may be empty or unreachable */ }
+    const loadItems = adminApi("/media").then(r => { items = r; }).catch(() => {});
 
     const { overlay, close } = openModal(`
-      <h3>Edit this image</h3>
-      <p class="hint">Pick something already uploaded, or upload a new photo or video — drag a file onto the box below, or use "Choose file" to open your computer's file browser.</p>
-      <div class="vn-media-pick">
-        ${items.map(m => `<div data-url="${m.url}" data-type="${m.type}">${
-          m.type === "video" ? `<video src="${m.url}" muted></video>` : `<img src="${m.url}">`
-        }</div>`).join("") || '<p style="font-size:.8rem; grid-column:1/-1;">Nothing uploaded yet — use the box below.</p>'}
-      </div>
-      <div class="vn-dropzone" id="vnDrop">Drag a photo or video here, or
-        <label style="text-decoration:underline; cursor:pointer;">choose a file<input type="file" id="vnFile" accept="image/*,video/*" style="display:none;"></label>
+      <h3>${existingMedia ? "Adjust framing" : "Choose an image or video"}</h3>
+      <div id="vnStep1">
+        <p class="hint">Pick something already uploaded, or upload a new photo or video — drag a file onto the box below, or use "Choose file" to open your computer's file browser.</p>
+        <div class="vn-media-pick" id="vnMediaPick"><p style="font-size:.8rem; grid-column:1/-1;">Loading your library…</p></div>
+        <div class="vn-dropzone" id="vnDrop">Drag a photo or video here, or
+          <label style="text-decoration:underline; cursor:pointer;">choose a file<input type="file" id="vnFile" accept="image/*,video/*" style="display:none;"></label>
+        </div>
       </div>
       <div id="vnStep2" style="display:none;">
-        <p style="font-size:.85rem; font-weight:500; margin-top:16px;">Drag to reposition, scroll (or use the buttons) to zoom</p>
+        <p style="font-size:.85rem; font-weight:500;">Drag to reposition, scroll (or use the buttons) to zoom</p>
         <div class="vn-crop-frame" id="vnCropFrame"></div>
         <div class="vn-crop-controls">
           <button type="button" class="vn-zoom-btn" id="vnZoomOut">−</button>
@@ -214,30 +221,37 @@
         <p class="vn-crop-hint">This is exactly how it will be framed on the site.</p>
         <div class="row">
           <button type="button" class="vn-btn primary" id="vnSaveImage">Save</button>
-          <button type="button" class="vn-btn" id="vnCancelStep2">Choose a different file</button>
+          ${existingMedia ? "" : '<button type="button" class="vn-btn" id="vnCancelStep2">Choose a different file</button>'}
           <button type="button" class="vn-btn" id="vnResetCrop">Reset</button>
         </div>
       </div>
     `, {});
 
+    loadItems.then(() => {
+      const pick = overlay.querySelector("#vnMediaPick");
+      pick.innerHTML = items.map(m => `<div data-url="${m.url}" data-type="${m.type}">${
+        m.type === "video" ? `<video src="${m.url}" muted></video>` : `<img src="${m.url}">`
+      }</div>`).join("") || '<p style="font-size:.8rem; grid-column:1/-1;">Nothing uploaded yet — use the box below.</p>';
+      pick.querySelectorAll("div[data-url]").forEach(div => {
+        div.onclick = () => showStep2({ url: div.dataset.url, type: div.dataset.type });
+      });
+    });
+
     let pending = null; // { url, type }
-    let posX = 50, posY = 50, zoom = 1; // posX/posY in %, zoom 1 = fit, up to 3 = 300%
+    let posX = 50, posY = 50, zoom = 1;
 
     function showStep2(media) {
       pending = media;
-      posX = 50; posY = 50; zoom = 1;
-      overlay.querySelector(".vn-media-pick").style.display = "none";
-      overlay.querySelector("#vnDrop").style.display = "none";
+      const parsed = media.position && /(\d+(\.\d+)?)% (\d+(\.\d+)?)%/.exec(media.position);
+      posX = parsed ? +parsed[1] : 50;
+      posY = parsed ? +parsed[3] : 50;
+      zoom = media.zoom || 1;
+
+      overlay.querySelector("#vnStep1").style.display = "none";
       overlay.querySelector("#vnStep2").style.display = "block";
-      overlay.querySelector("#vnZoomSlider").value = 100;
 
       const frame = overlay.querySelector("#vnCropFrame");
-      // Match the live frame's real aspect ratio so the preview is exact,
-      // not an arbitrary approximation.
-      const liveRatio = el.getBoundingClientRect();
-      if (liveRatio.width > 0 && liveRatio.height > 0) {
-        frame.style.aspectRatio = `${liveRatio.width} / ${liveRatio.height}`;
-      }
+      if (aspectRatio) frame.style.aspectRatio = `${aspectRatio}`;
       frame.innerHTML = media.type === "video"
         ? `<video src="${media.url}" muted loop autoplay playsinline></video>`
         : `<img src="${media.url}" draggable="false">`;
@@ -261,18 +275,10 @@
 
     function wireCropInteraction(frame) {
       let dragging = false, lastX = 0, lastY = 0;
-
-      const onDown = (clientX, clientY) => {
-        dragging = true;
-        lastX = clientX; lastY = clientY;
-        frame.classList.add("dragging");
-      };
+      const onDown = (clientX, clientY) => { dragging = true; lastX = clientX; lastY = clientY; frame.classList.add("dragging"); };
       const onMove = (clientX, clientY) => {
         if (!dragging) return;
         const rect = frame.getBoundingClientRect();
-        // Convert pixel drag distance into a % shift of object-position.
-        // Dividing by zoom keeps the drag feeling 1:1 with the cursor
-        // regardless of how far zoomed in you are.
         const dxPct = ((clientX - lastX) / rect.width) * 100 / zoom;
         const dyPct = ((clientY - lastY) / rect.height) * 100 / zoom;
         posX = Math.min(100, Math.max(0, posX - dxPct));
@@ -285,25 +291,16 @@
       frame.addEventListener("mousedown", e => { e.preventDefault(); onDown(e.clientX, e.clientY); });
       window.addEventListener("mousemove", e => onMove(e.clientX, e.clientY));
       window.addEventListener("mouseup", onUp);
-
       frame.addEventListener("touchstart", e => { const t = e.touches[0]; onDown(t.clientX, t.clientY); }, { passive: true });
       frame.addEventListener("touchmove", e => { const t = e.touches[0]; onMove(t.clientX, t.clientY); }, { passive: true });
       frame.addEventListener("touchend", onUp);
-
-      frame.addEventListener("wheel", e => {
-        e.preventDefault();
-        setZoom(zoom - e.deltaY * 0.0015);
-      }, { passive: false });
+      frame.addEventListener("wheel", e => { e.preventDefault(); setZoom(zoom - e.deltaY * 0.0015); }, { passive: false });
     }
 
     overlay.querySelector("#vnZoomIn").onclick = () => setZoom(zoom + 0.2);
     overlay.querySelector("#vnZoomOut").onclick = () => setZoom(zoom - 0.2);
     overlay.querySelector("#vnZoomSlider").addEventListener("input", e => setZoom(e.target.value / 100));
     overlay.querySelector("#vnResetCrop").onclick = () => { posX = 50; posY = 50; zoom = 1; renderTransform(); };
-
-    overlay.querySelectorAll(".vn-media-pick div[data-url]").forEach(div => {
-      div.onclick = () => showStep2({ url: div.dataset.url, type: div.dataset.type });
-    });
 
     async function handleFiles(files) {
       const file = files[0];
@@ -319,20 +316,35 @@
     overlay.querySelector("#vnFile").addEventListener("change", e => handleFiles(e.target.files));
     wireDropzone(overlay.querySelector("#vnDrop"), handleFiles);
 
-    overlay.querySelector("#vnCancelStep2").onclick = () => {
-      overlay.querySelector(".vn-media-pick").style.display = "grid";
-      overlay.querySelector("#vnDrop").style.display = "block";
+    overlay.querySelector("#vnCancelStep2")?.addEventListener("click", () => {
+      overlay.querySelector("#vnStep1").style.display = "block";
       overlay.querySelector("#vnStep2").style.display = "none";
+    });
+
+    overlay.querySelector("#vnSaveImage").onclick = () => {
+      onSave({ url: pending.url, type: pending.type, position: `${posX}% ${posY}%`, zoom });
+      close();
     };
 
-    overlay.querySelector("#vnSaveImage").onclick = async () => {
-      const media = { url: pending.url, type: pending.type, position: `${posX}% ${posY}%`, zoom };
-      try {
-        await adminApi("/settings", { method: "PUT", body: JSON.stringify({ [key]: media }) });
-        window.vennusApplyEditableImage(el, media);
-        close();
-      } catch (err) { alert(err.message); }
-    };
+    // Editing an existing photo's framing — skip straight to the crop step.
+    if (existingMedia) showStep2(existingMedia);
+  }
+
+  /* Every [data-editable-image] spot (hero banners, editorial photos,
+     mega-menu features) uses the shared modal above, matching its own
+     live aspect ratio and saving straight to Settings. */
+  function openImageEditor(el) {
+    const key = el.dataset.editableImage;
+    const rect = el.getBoundingClientRect();
+    openPickCropModal({
+      aspectRatio: rect.width && rect.height ? rect.width / rect.height : 16 / 9,
+      onSave: async (media) => {
+        try {
+          await adminApi("/settings", { method: "PUT", body: JSON.stringify({ [key]: media }) });
+          window.vennusApplyEditableImage(el, media);
+        } catch (err) { alert(err.message); }
+      }
+    });
   }
 
   function scanEditableImages() {
@@ -361,27 +373,40 @@
   }
 
   /* =================================================================
-     PRODUCT PHOTOS — inline add/remove/reorder, right on the site.
+     PRODUCT PHOTOS — inline add/remove/reorder/reframe, right on the
+     site. Each photo carries its own crop (position + zoom), and can
+     be a photo or a video.
      ================================================================= */
+  const PRODUCT_ASPECT = 4 / 5; // matches .product-media / .product-gallery-main
+
+  function mediaStyleAttr(m) {
+    const zoomPart = m.zoom && m.zoom !== 1 ? ` transform:scale(${m.zoom}); transform-origin:${m.position || "center center"};` : "";
+    return `object-fit:cover; object-position:${m.position || "center center"};${zoomPart}`;
+  }
+
   async function openProductPhotoEditor(productId, mediaEl) {
     let product;
     try { product = await adminApi("/products/" + productId); }
     catch (err) { return alert(err.message); }
 
     let items = [];
-    try { items = await adminApi("/media?type=image"); } catch {}
+    try { items = await adminApi("/media"); } catch {}
 
-    let photos = (product.images || []).slice();
+    // Photos may still be plain URL strings from before per-photo framing
+    // existed — normalize those to the same shape as everything else.
+    let photos = (product.images || []).map(p => typeof p === "string" ? { url: p, type: "image", position: "center center", zoom: 1 } : p);
 
     const { overlay, close } = openModal(`
       <h3>${product.name}</h3>
-      <p class="hint">Add, remove, or reorder this product's photos. Drag a file below to upload, or pick from your library.</p>
+      <p class="hint">Add, remove, or reframe this product's photos and videos. Click a thumbnail's "Crop" button to adjust how it's framed.</p>
       <div class="vn-photo-list" id="vnPhotoList"></div>
       <div class="vn-media-pick" id="vnLibraryPick">
-        ${items.map(m => `<div data-url="${m.url}">${`<img src="${m.url}">`}</div>`).join("") || '<p style="font-size:.8rem; grid-column:1/-1;">Nothing in your library yet.</p>'}
+        ${items.map(m => `<div data-url="${m.url}" data-type="${m.type}">${
+          m.type === "video" ? `<video src="${m.url}" muted></video>` : `<img src="${m.url}">`
+        }</div>`).join("") || '<p style="font-size:.8rem; grid-column:1/-1;">Nothing in your library yet.</p>'}
       </div>
-      <div class="vn-dropzone" id="vnDrop">Drag photos here, or
-        <label style="text-decoration:underline; cursor:pointer;">choose files<input type="file" id="vnFile" accept="image/*" multiple style="display:none;"></label>
+      <div class="vn-dropzone" id="vnDrop">Drag photos or video here, or
+        <label style="text-decoration:underline; cursor:pointer;">choose files<input type="file" id="vnFile" accept="image/*,video/*" multiple style="display:none;"></label>
       </div>
       <div class="row">
         <button type="button" class="vn-btn primary" id="vnSavePhotos">Save changes</button>
@@ -390,17 +415,42 @@
     `, { wide: true });
 
     function renderList() {
-      overlay.querySelector("#vnPhotoList").innerHTML = photos.map((url, i) =>
-        `<div class="item" data-i="${i}"><img src="${url}"><button type="button" data-rm="${i}" title="Remove">×</button></div>`).join("")
+      overlay.querySelector("#vnPhotoList").innerHTML = photos.map((m, i) => `
+        <div class="item" data-i="${i}">
+          ${m.type === "video"
+            ? `<video src="${m.url}" muted style="${mediaStyleAttr(m)}"></video>`
+            : `<img src="${m.url}" style="${mediaStyleAttr(m)}">`}
+          <button type="button" data-rm="${i}" title="Remove">×</button>
+        </div>`).join("")
         || '<p style="font-size:.8rem;">No photos yet — add one below.</p>';
+
       overlay.querySelectorAll("[data-rm]").forEach(b => {
         b.onclick = () => { photos.splice(+b.dataset.rm, 1); renderList(); };
+      });
+      // A "Crop" button per thumbnail, added after the list so it doesn't
+      // fight the innerHTML render above for its click handler.
+      overlay.querySelectorAll(".vn-photo-list .item").forEach(item => {
+        const i = +item.dataset.i;
+        const cropBtn = document.createElement("button");
+        cropBtn.type = "button";
+        cropBtn.textContent = "Crop";
+        cropBtn.style.cssText = "position:absolute; bottom:3px; left:3px; font-size:.62rem; padding:2px 6px; background:rgba(35,26,18,.8); color:#fff; border:none; cursor:pointer;";
+        cropBtn.onclick = () => openPickCropModal({
+          aspectRatio: PRODUCT_ASPECT,
+          existingMedia: photos[i],
+          onSave: (media) => { photos[i] = media; renderList(); }
+        });
+        item.appendChild(cropBtn);
       });
     }
     renderList();
 
     overlay.querySelectorAll("#vnLibraryPick div[data-url]").forEach(div => {
-      div.onclick = () => { photos.push(div.dataset.url); renderList(); };
+      div.onclick = () => openPickCropModal({
+        aspectRatio: PRODUCT_ASPECT,
+        existingMedia: { url: div.dataset.url, type: div.dataset.type },
+        onSave: (media) => { photos.push(media); renderList(); }
+      });
     });
 
     async function handleFiles(files) {
@@ -409,8 +459,18 @@
       [...files].forEach(f => fd.append("files", f));
       try {
         const r = await adminApi("/media", { method: "POST", body: fd });
-        r.files.forEach(f => photos.push(f.url));
-        renderList();
+        // Frame each newly uploaded file in turn.
+        const queue = r.files.slice();
+        const next = () => {
+          const f = queue.shift();
+          if (!f) return;
+          openPickCropModal({
+            aspectRatio: PRODUCT_ASPECT,
+            existingMedia: { url: f.url, type: f.type },
+            onSave: (media) => { photos.push(media); renderList(); next(); }
+          });
+        };
+        next();
       } catch (err) { alert(err.message); }
     }
     overlay.querySelector("#vnFile").addEventListener("change", e => handleFiles(e.target.files));
@@ -421,8 +481,11 @@
         await adminApi("/products/" + productId, { method: "PUT", body: JSON.stringify({ images: photos }) });
         // Reflect immediately on this page without needing a reload
         if (mediaEl && photos.length) {
-          const existing = mediaEl.querySelector("img, .placeholder-block");
-          if (existing) existing.outerHTML = `<img src="${photos[0]}" alt="" loading="lazy" style="position:absolute; inset:0; width:100%; height:100%; object-fit:cover;">`;
+          const existing = mediaEl.querySelector("img, video, .placeholder-block");
+          const m = photos[0];
+          if (existing) existing.outerHTML = m.type === "video"
+            ? `<video autoplay muted loop playsinline style="position:absolute; inset:0; width:100%; height:100%; ${mediaStyleAttr(m)}"><source src="${m.url}"></video>`
+            : `<img src="${m.url}" alt="" loading="lazy" style="position:absolute; inset:0; width:100%; height:100%; ${mediaStyleAttr(m)}">`;
         }
         close();
       } catch (err) { alert(err.message); }

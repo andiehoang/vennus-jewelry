@@ -249,13 +249,15 @@ document.addEventListener("DOMContentLoaded", () => {
      SHOP FILTER CHIPS
      --------------------------------------------------------------- */
   const filterChips = document.querySelectorAll(".filter-chip");
-  const productCards = document.querySelectorAll(".product-card");
   filterChips.forEach(chip => {
     chip.addEventListener("click", () => {
       filterChips.forEach(c => c.classList.remove("active"));
       chip.classList.add("active");
       const cat = chip.dataset.filter;
-      productCards.forEach(card => {
+      // Queried fresh here, not captured once at setup — the grid renders
+      // asynchronously (after the live catalogue loads), so a snapshot
+      // taken at page-load time would always be empty.
+      document.querySelectorAll(".product-card").forEach(card => {
         card.style.display = (cat === "all" || card.dataset.category === cat) ? "" : "none";
       });
     });

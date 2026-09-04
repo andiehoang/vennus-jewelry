@@ -15,6 +15,25 @@ function tagLabel(tag) {
   return { "new": "New", "bestseller": "Bestseller", "sale": "Sale" }[tag] || "";
 }
 
+/* Product images can be a plain URL string (from before per-photo framing
+   existed) or a full { url, type, position, zoom } object. This makes
+   both work the same way everywhere they're rendered. */
+function normalizeMedia(entry) {
+  if (!entry) return null;
+  if (typeof entry === "string") return { url: entry, type: "image", position: "center center", zoom: 1 };
+  return { type: "image", position: "center center", zoom: 1, ...entry };
+}
+
+function mediaTagHTML(entry, altText, extraStyle) {
+  const m = normalizeMedia(entry);
+  if (!m) return "";
+  const zoomPart = m.zoom && m.zoom !== 1 ? ` transform:scale(${m.zoom}); transform-origin:${m.position};` : "";
+  const style = `object-fit:cover; object-position:${m.position};${zoomPart}${extraStyle || ""}`;
+  return m.type === "video"
+    ? `<video autoplay muted loop playsinline style="${style}"><source src="${m.url}"></video>`
+    : `<img src="${m.url}" alt="${altText || ""}" loading="lazy" style="${style}">`;
+}
+
 function productCardHTML(p) {
   const tag = !p.inStock
     ? `<span class="product-tag sold-out">Sold Out</span>`
@@ -24,9 +43,9 @@ function productCardHTML(p) {
     ? `${vennusFormatPrice(p.price)} <span class="was">${vennusFormatPrice(p.compareAt)}</span>`
     : vennusFormatPrice(p.price);
 
-  // Real photo if one's been uploaded in the admin; placeholder otherwise.
+  // Real photo/video if one's been uploaded in the admin; placeholder otherwise.
   const media = (p.images && p.images.length)
-    ? `<img src="${p.images[0]}" alt="${p.name}" loading="lazy" style="position:absolute; inset:0; width:100%; height:100%; object-fit:cover;">`
+    ? mediaTagHTML(p.images[0], p.name, " position:absolute; inset:0; width:100%; height:100%;")
     : `<div class="placeholder-block" aria-hidden="true"><span class="placeholder-label">Photo — ${p.name}</span></div>`;
 
   return `
@@ -130,23 +149,23 @@ function renderProductDetail() {
   const detailsList = document.getElementById("pdpDetailsList");
   detailsList.innerHTML = product.details.map(d => `<li>${d}</li>`).join("");
 
-  /* Gallery — real uploaded photos if any exist, placeholders otherwise */
+  /* Gallery — real uploaded photos/videos if any exist, placeholders otherwise */
   const galleryMain = document.getElementById("pdpGalleryMain");
   const galleryThumbs = document.getElementById("pdpGalleryThumbs");
-  const photos = product.images && product.images.length ? product.images : null;
+  const photos = product.images && product.images.length ? product.images.map(normalizeMedia) : null;
 
-  function mainPhotoHTML(src, label) {
-    return src
-      ? `<img src="${src}" alt="${product.name}" style="width:100%; height:100%; object-fit:cover;">`
+  function mainPhotoHTML(entry, label) {
+    return entry
+      ? mediaTagHTML(entry, product.name, " width:100%; height:100%;")
       : `<div class="placeholder-block" aria-hidden="true"><span class="placeholder-label">${label}</span></div>`;
   }
 
   galleryMain.innerHTML = mainPhotoHTML(photos ? photos[0] : null, `Main photo — ${product.name}`);
 
   if (photos) {
-    galleryThumbs.innerHTML = photos.map((src, i) =>
-      `<div class="placeholder-block" data-thumb data-src="${src}" style="padding:0; overflow:hidden;">
-        <img src="${src}" alt="View ${i + 1}" style="width:100%; height:100%; object-fit:cover;">
+    galleryThumbs.innerHTML = photos.map((entry, i) =>
+      `<div class="placeholder-block" data-thumb data-i="${i}" style="padding:0; overflow:hidden;">
+        ${mediaTagHTML(entry, `View ${i + 1}`, " width:100%; height:100%;")}
       </div>`
     ).join("");
   } else {
@@ -158,9 +177,9 @@ function renderProductDetail() {
 
   galleryThumbs.querySelectorAll("[data-thumb]").forEach(thumb => {
     thumb.addEventListener("click", () => {
-      const src = thumb.dataset.src;
-      galleryMain.innerHTML = src
-        ? mainPhotoHTML(src)
+      const entry = thumb.dataset.i !== undefined ? photos[+thumb.dataset.i] : null;
+      galleryMain.innerHTML = entry
+        ? mainPhotoHTML(entry)
         : `<div class="placeholder-block" aria-hidden="true"><span class="placeholder-label">${thumb.querySelector(".placeholder-label").textContent} — ${product.name}</span></div>`;
     });
   });
