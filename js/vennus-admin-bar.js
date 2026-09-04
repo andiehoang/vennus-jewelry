@@ -106,24 +106,14 @@
       }
       #vn-admin-bar button:hover, #vn-admin-bar a.vn-link:hover { background: rgba(243,237,227,.12); }
 
-      .vn-edit-pencil {
-        position: absolute; bottom: 10px; left: 10px; z-index: 5;
-        width: 30px; height: 30px; background: rgba(35,32,25,.85); color: #F3EDE3;
-        border: none; display: flex; align-items: center; justify-content: center;
-        cursor: pointer; font-size: .85rem; text-decoration: none; padding: 0;
-      }
-      .vn-edit-pencil:hover { background: #232019; }
-      /* Editorial/hero/mega-menu images anchor their own captions and CTAs
-         to the bottom-left, so this pencil goes top-right instead, which
-         stays clear on every one of them. */
-      .vn-edit-pencil-top {
-        position: absolute; top: 10px; right: 10px; z-index: 20;
-        width: 32px; height: 32px; background: rgba(35,32,25,.9); color: #F3EDE3;
-        border: none; display: flex; align-items: center; justify-content: center;
-        cursor: pointer; font-size: .9rem; text-decoration: none; padding: 0;
+      .vn-edit-btn {
+        position: absolute; bottom: 10px; right: 10px; z-index: 20;
+        background: rgba(35,32,25,.9); color: #F3EDE3; border: none;
+        padding: 7px 14px; font-size: .74rem; letter-spacing: .04em;
+        cursor: pointer; font-family: 'Jost', system-ui, sans-serif;
         box-shadow: 0 2px 8px rgba(0,0,0,.25);
       }
-      .vn-edit-pencil-top:hover { background: #232019; }
+      .vn-edit-btn:hover { background: #232019; }
 
       .vn-modal { position: fixed; inset: 0; background: rgba(35,26,18,.5); z-index: 500;
         display: flex; align-items: center; justify-content: center; padding: 20px; overflow-y: auto; }
@@ -278,15 +268,26 @@
 
   function scanEditableImages() {
     document.querySelectorAll("[data-editable-image]").forEach(el => {
-      if (el.querySelector(":scope > .vn-edit-pencil-top")) return;
-      if (getComputedStyle(el).position === "static") el.style.position = "relative";
+      // .hero .placeholder-block establishes its own stacking context
+      // (position:absolute + an explicit z-index, for layering behind
+      // .hero-content) — which traps anything nested inside it, so no
+      // z-index on a button placed there could ever outrank .hero-content,
+      // a sibling of that whole box. Attaching the button to the shared
+      // .hero parent instead — a true sibling of .hero-content — sidesteps
+      // that entirely, since it's the same footprint either way here.
+      const isHeroLayer = el.matches(".hero .placeholder-block");
+      const container = isHeroLayer ? el.closest(".hero") : el;
+      const key = el.dataset.editableImage;
+      if (container.querySelector(`:scope > .vn-edit-btn[data-key="${key}"]`)) return;
+      if (getComputedStyle(container).position === "static") container.style.position = "relative";
       const btn = document.createElement("button");
       btn.type = "button";
-      btn.className = "vn-edit-pencil-top";
+      btn.className = "vn-edit-btn";
+      btn.dataset.key = key;
       btn.title = "Edit this image";
-      btn.textContent = "✎";
+      btn.textContent = "Edit";
       btn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); openImageEditor(el); });
-      el.appendChild(btn);
+      container.appendChild(btn);
     });
   }
 
@@ -366,10 +367,10 @@
     if (getComputedStyle(media).position === "static") media.style.position = "relative";
     const btn = document.createElement("button");
     btn.type = "button";
-    btn.className = "vn-edit-pencil";
+    btn.className = "vn-edit-btn";
     btn.setAttribute("data-vn-edit", "1");
     btn.title = "Edit this product's photos";
-    btn.textContent = "✎";
+    btn.textContent = "Edit";
     btn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); openProductPhotoEditor(productId, media); });
     media.appendChild(btn);
   }
@@ -392,9 +393,9 @@
           const btn = document.createElement("button");
           btn.type = "button";
           btn.id = "vnEditThisProductPhotos";
-          btn.className = "vn-edit-pencil-top";
+          btn.className = "vn-edit-btn";
           btn.title = "Edit this product's photos";
-          btn.textContent = "✎";
+          btn.textContent = "Edit";
           btn.addEventListener("click", (e) => { e.preventDefault(); openProductPhotoEditor(id, galleryMain); });
           galleryMain.appendChild(btn);
         }
@@ -422,7 +423,7 @@
       const bar = document.createElement("div");
       bar.id = "vn-admin-bar";
       bar.innerHTML = `
-        <span>Editing as <strong>${user.name}</strong> (${user.role}) — look for the ✎ on any image</span>
+        <span>Editing as <strong>${user.name}</strong> (${user.role}) — look for "Edit" on any image</span>
         <span class="vn-actions">
           <a class="vn-link" href="${VENNUS_API}/admin" target="_blank" rel="noopener">Open full admin ↗</a>
           <button type="button" id="vnAdminSignOut">Sign out</button>

@@ -99,7 +99,7 @@ async function vennusLoadCatalogue() {
       // independent scripts isn't guaranteed. Preserve the pencil across
       // the innerHTML replacement rather than letting whichever runs
       // second silently erase the other's work.
-      const pencil = el.querySelector(":scope > .vn-edit-pencil-top");
+      const pencil = el.querySelector(":scope > .vn-edit-btn");
       el.innerHTML = media.type === "video"
         ? `<video autoplay muted loop playsinline style="width:100%; height:100%; object-fit:cover; object-position:${position}; display:block;"><source src="${media.url}"></video>`
         : `<img src="${media.url}" alt="" style="width:100%; height:100%; object-fit:cover; object-position:${position}; display:block;">`;
