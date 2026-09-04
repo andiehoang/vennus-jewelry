@@ -147,17 +147,38 @@
   <button type="button" class="icon-btn mobile-close" data-mobile-close aria-label="Close menu">
     <svg viewBox="0 0 24 24"><line x1="4" y1="4" x2="20" y2="20"/><line x1="20" y1="4" x2="4" y2="20"/></svg>
   </button>
-  <ul>
+  <ul class="mobile-primary">
     <li><a href="shop.html">New Arrivals</a></li>
-    <li><a href="shop.html">Gold Jewelry</a></li>
-    <li><a href="shop.html">Silver Jewelry</a></li>
-    <li><a href="shop.html">Solid Pearl Jewelry</a></li>
-    <li><a href="shop.html">Collections</a></li>
+    <li>
+      <button type="button" class="mobile-toggle" data-mobile-toggle="mMenuJewelry" aria-expanded="false">
+        Jewelry <span class="chevron">+</span>
+      </button>
+      <ul class="mobile-submenu" id="mMenuJewelry">
+        <li><a href="shop.html?category=rings">Rings</a></li>
+        <li><a href="shop.html?category=bracelets">Bracelets</a></li>
+        <li><a href="shop.html?category=necklaces">Necklaces &amp; Pendants</a></li>
+        <li><a href="shop.html?category=earrings">Earrings</a></li>
+        <li><a href="shop.html">Gold, Silver &amp; Solid Pearl</a></li>
+        <li><a href="shop.html">View All Jewelry</a></li>
+      </ul>
+    </li>
     <li><a href="shop.html">Gifts</a></li>
-    <li><a href="maison.html">The Maison of Vennus</a></li>
+    <li>
+      <button type="button" class="mobile-toggle" data-mobile-toggle="mMenuMaison" aria-expanded="false">
+        Maison <span class="chevron">+</span>
+      </button>
+      <ul class="mobile-submenu" id="mMenuMaison">
+        <li><a href="maison.html#story">Our Story</a></li>
+        <li><a href="maison.html#craft">Craftsmanship</a></li>
+        <li><a href="maison.html#sustainability">Sustainability</a></li>
+        <li><a href="maison.html">The Maison of Vennus</a></li>
+      </ul>
+    </li>
+  </ul>
+  <ul class="mobile-utility">
     <li><a href="login.html">Account</a></li>
     <li><a href="info.html#services-contact">Services</a></li>
-    <li><a href="info.html#orders-track">Orders</a></li>
+    <li><a href="info.html#orders-track">Track Your Order</a></li>
     <li><a href="info.html#legal-terms">Legal</a></li>
   </ul>
 </div>
@@ -268,6 +289,17 @@
     </div>
   </div>
 </main>
+
+<!-- ============ MOBILE STICKY ADD-TO-BAG BAR ============
+     Hidden on desktop (see style.css). On mobile, appears once the
+     real "Add to Bag" button above has scrolled out of view. -->
+<div class="pdp-sticky-bar" id="pdpStickyBar">
+  <div class="pdp-sticky-info">
+    <span class="pdp-sticky-name" id="pdpStickyName"></span>
+    <span class="pdp-sticky-price" id="pdpStickyPrice"></span>
+  </div>
+  <button type="button" class="btn btn-primary" id="pdpStickyAddToBag">Add to Bag</button>
+</div>
 
 <!-- ============ FOOTER ============ -->
 <footer class="site-footer">

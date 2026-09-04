@@ -591,28 +591,73 @@ body.hero-page.header-light .site-header:not(.is-solid):not(.menu-open) .hamburg
 .cart-note { font-size: 0.75rem; color: var(--beton); text-align: center; margin-top: 12px; }
 
 /* -----------------------------------------------------------------
-   9. MOBILE MENU
+   9. MOBILE MENU (Hermès-style full-screen panel: top-level
+   categories that expand in place, matching sub-links tucked
+   underneath, and a quiet utility row pinned to the bottom)
    ----------------------------------------------------------------- */
 .mobile-menu {
   position: fixed; inset: 0;
   background: var(--blanc);
   z-index: 98;
-  padding: 100px 32px 40px;
+  padding: 96px 32px 40px;
   transform: translateX(-100%);
   transition: transform 0.35s var(--ease);
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
 }
 .mobile-menu.open { transform: translateX(0); }
-.mobile-menu ul li { border-bottom: 1px solid var(--line-soft); }
-.mobile-menu ul li a,
-.mobile-menu ul li button {
-  display: block;
+
+.mobile-primary > li { border-bottom: 1px solid var(--line-soft); }
+.mobile-primary > li > a,
+.mobile-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   width: 100%;
   text-align: left;
   padding: 18px 0;
   font-family: var(--font-display);
-  font-size: 1.4rem;
+  font-size: 1.35rem;
 }
+.mobile-toggle .chevron {
+  font-family: var(--font-body);
+  font-size: 1.25rem;
+  color: var(--beton);
+  transition: transform 0.25s var(--ease);
+}
+.mobile-toggle[aria-expanded="true"] .chevron { transform: rotate(45deg); }
+
+.mobile-submenu {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s var(--ease);
+}
+.mobile-submenu.open { max-height: 480px; }
+.mobile-submenu li a {
+  display: block;
+  padding: 11px 0 11px 2px;
+  font-family: var(--font-body);
+  font-size: 0.92rem;
+  color: var(--beton);
+}
+.mobile-submenu li:last-child a { padding-bottom: 18px; }
+.mobile-submenu li a:hover { color: var(--chai); }
+
+.mobile-utility {
+  margin-top: auto;
+  padding-top: var(--gap-md);
+  border-top: 1px solid var(--line-soft);
+}
+.mobile-utility li a {
+  display: block;
+  padding: 10px 0;
+  font-size: 0.76rem;
+  letter-spacing: 0.06em;
+  color: var(--beton);
+}
+.mobile-utility li a:hover { color: var(--chai); }
+
 .mobile-close { position: fixed; top: 24px; right: 28px; z-index: 99; }
 
 /* -----------------------------------------------------------------
@@ -1028,6 +1073,37 @@ site-footer, .site-footer { display: block; background: var(--blanc); }
   color: var(--beton);
 }
 
+/* Mobile: each column collapses into a tap-to-expand accordion row
+   (the toggling is purely a class main.js adds/removes on click —
+   these rules are what give that class meaning, and only at mobile
+   widths, so the same markup is a plain open grid on desktop). */
+@media (max-width: 860px) {
+  .footer-col { border-top: 1px solid var(--line-soft); }
+  .footer-col:last-child { border-bottom: 1px solid var(--line-soft); }
+  .footer-col h5 {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0;
+    padding: 16px 2px;
+    cursor: pointer;
+  }
+  .footer-col h5::after {
+    content: '+';
+    font-family: var(--font-display);
+    font-size: 1.15rem;
+    color: var(--beton);
+  }
+  .footer-col.open h5::after { content: '\2212'; }
+  .footer-col ul {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s var(--ease);
+  }
+  .footer-col.open ul { max-height: 400px; }
+  .footer-col ul li:last-child { padding-bottom: 16px; }
+}
+
 /* -----------------------------------------------------------------
    17. RESPONSIVE
    ----------------------------------------------------------------- */
@@ -1042,18 +1118,34 @@ site-footer, .site-footer { display: block; background: var(--blanc); }
 }
 
 @media (max-width: 860px) {
-  .primary-nav, .nav-side.nav-left { display: none; }
-  .hamburger { display: flex; }
-  .nav-wrap { grid-template-columns: auto 1fr auto; padding: 18px 20px; }
-  .logo { font-size: 1.5rem; text-align: left; justify-self: start; }
+  /* Was ".nav-side.nav-left { display: none }" — that hid the whole
+     left-hand box INCLUDING the hamburger nested inside it (a parent's
+     display:none removes its children too, no matter what display
+     the child asks for), so the button to open the mobile menu was
+     never actually reachable. Hiding only the nested <ul> instead
+     leaves the hamburger showing, which is the fix + the point of a
+     symmetric 1fr/auto/1fr grid below: it centers the logo against
+     the true edges of the header, not just the middle of whatever
+     space is left over between two different-width side clusters. */
+  .primary-nav { display: none; }
+  .hamburger { display: flex; padding: 8px; margin: -8px; }
+  .nav-wrap { grid-template-columns: 1fr auto 1fr; padding: 14px 16px; gap: 10px; }
+  .nav-side.nav-right { gap: 18px; }
+  .logo { font-size: 1.4rem; letter-spacing: 0.1em; }
   .container { padding: 0 20px; }
   .product-grid { grid-template-columns: repeat(2, 1fr); gap: 24px 16px; }
   .editorial-split { grid-template-columns: 1fr; }
   .editorial-copy { padding: var(--gap-lg) 24px; }
+  .hero-content { padding: 0 24px 52px; }
   .product-detail { grid-template-columns: 1fr; gap: var(--gap-lg); }
   .info-layout { grid-template-columns: 1fr; }
   .info-nav { position: static; display: flex; gap: 28px; overflow-x: auto; padding-bottom: 10px; }
-  .footer-columns { grid-template-columns: 1fr 1fr; }
+  .footer-columns { grid-template-columns: 1fr; gap: 0; padding-top: var(--gap-md); }
+  .footer-brand { margin-bottom: var(--gap-md); }
+  /* A row of filter chips scrolls sideways instead of wrapping onto
+     several centered lines — same treatment as .info-nav above. */
+  .filter-bar { justify-content: flex-start; flex-wrap: nowrap; overflow-x: auto; padding-bottom: 6px; -webkit-overflow-scrolling: touch; }
+  .filter-chip { flex-shrink: 0; }
   .cookie-inner { flex-direction: column; align-items: flex-start; }
   .section { padding: var(--gap-lg) 0; }
 }
@@ -1062,6 +1154,43 @@ site-footer, .site-footer { display: block; background: var(--blanc); }
   .product-grid { grid-template-columns: repeat(2, 1fr); gap: 18px 12px; }
   h1 { font-size: 2rem; }
   .hero { height: 72vh; }
-  .footer-columns { grid-template-columns: 1fr 1fr; }
   .value-strip { grid-template-columns: 1fr 1fr; }
+}
+
+/* -----------------------------------------------------------------
+   18. PDP MOBILE STICKY BAR
+   Once the real "Add to Bag" control (up in .qty-and-cart) scrolls
+   out of view, a slim bar pins the price and an Add to Bag button to
+   the bottom of the screen — the same pattern Hermès uses on product
+   pages so the purchase action is always one thumb-reach away. Its
+   click just re-triggers the real button (js/main.js), so all the
+   actual stock/quantity/option logic stays in one place. Absent on
+   desktop, where the real control is already always in view.
+   ----------------------------------------------------------------- */
+.pdp-sticky-bar { display: none; }
+
+@media (max-width: 860px) {
+  .pdp-sticky-bar {
+    position: fixed; left: 0; right: 0; bottom: 0;
+    z-index: 40;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    background: var(--blanc);
+    border-top: 1px solid var(--line);
+    padding: 12px 20px;
+    padding-bottom: calc(12px + env(safe-area-inset-bottom));
+    box-shadow: 0 -8px 24px rgba(59, 44, 32, 0.1);
+    transform: translateY(100%);
+    transition: transform 0.3s var(--ease);
+  }
+  .pdp-sticky-bar.show { transform: translateY(0); }
+  .pdp-sticky-info { display: flex; flex-direction: column; min-width: 0; }
+  .pdp-sticky-name {
+    font-size: 0.82rem; color: var(--umber);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .pdp-sticky-price { font-size: 0.78rem; color: var(--beton); }
+  .pdp-sticky-bar .btn { padding: 12px 26px; flex-shrink: 0; white-space: nowrap; }
 }

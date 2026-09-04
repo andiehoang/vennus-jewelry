@@ -139,9 +139,55 @@ document.addEventListener("DOMContentLoaded", () => {
   document.querySelectorAll(".mobile-menu [data-mobile-toggle]").forEach(btn => {
     btn.addEventListener("click", () => {
       const panel = document.getElementById(btn.dataset.mobileToggle);
-      panel?.classList.toggle("open");
+      const isOpen = panel?.classList.toggle("open");
+      btn.setAttribute("aria-expanded", isOpen ? "true" : "false");
     });
   });
+
+  /* ---------------------------------------------------------------
+     FOOTER ACCORDION (mobile only — see the media query in
+     style.css; toggling this class has no visual effect above that
+     width, so this handler doesn't need its own width check)
+     --------------------------------------------------------------- */
+  document.querySelectorAll(".footer-col > h5").forEach(h5 => {
+    h5.addEventListener("click", () => {
+      const col = h5.closest(".footer-col");
+      const wasOpen = col.classList.contains("open");
+      col.parentElement.querySelectorAll(".footer-col").forEach(c => c.classList.remove("open"));
+      if (!wasOpen) col.classList.add("open");
+    });
+  });
+
+  /* ---------------------------------------------------------------
+     PDP MOBILE STICKY ADD-TO-BAG BAR
+     Mirrors the name/price once, then shows itself once the real
+     "Add to Bag" button (in .qty-and-cart, populated by render.js)
+     scrolls out of view. Clicking it just clicks the real button,
+     so quantity/option/waitlist logic stays defined in one place.
+     --------------------------------------------------------------- */
+  const pdpStickyBar = document.getElementById("pdpStickyBar");
+  const pdpRealAddBtn = document.getElementById("pdpAddToBag");
+  if (pdpStickyBar && pdpRealAddBtn) {
+    const stickyName = document.getElementById("pdpStickyName");
+    const stickyPrice = document.getElementById("pdpStickyPrice");
+    const syncText = () => {
+      if (stickyName) stickyName.textContent = document.getElementById("pdpName")?.textContent || "";
+      if (stickyPrice) stickyPrice.textContent = document.getElementById("pdpPrice")?.textContent || "";
+      if (document.getElementById("pdpStickyAddToBag")) {
+        document.getElementById("pdpStickyAddToBag").textContent = pdpRealAddBtn.textContent;
+      }
+    };
+    syncText();
+    // The real button's label can change (e.g. to "Notify Me") once
+    // stock is known; keep the sticky copy in sync with it.
+    new MutationObserver(syncText).observe(pdpRealAddBtn, { childList: true, characterData: true, subtree: true });
+
+    new IntersectionObserver(([entry]) => {
+      pdpStickyBar.classList.toggle("show", !entry.isIntersecting);
+    }, { rootMargin: "0px 0px -20% 0px" }).observe(pdpRealAddBtn);
+
+    document.getElementById("pdpStickyAddToBag")?.addEventListener("click", () => pdpRealAddBtn.click());
+  }
 
   /* ---------------------------------------------------------------
      SEARCH OVERLAY
