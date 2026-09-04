@@ -392,7 +392,7 @@
           const btn = document.createElement("button");
           btn.type = "button";
           btn.id = "vnEditThisProductPhotos";
-          btn.className = "vn-edit-pencil";
+          btn.className = "vn-edit-pencil-top";
           btn.title = "Edit this product's photos";
           btn.textContent = "✎";
           btn.addEventListener("click", (e) => { e.preventDefault(); openProductPhotoEditor(id, galleryMain); });

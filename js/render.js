@@ -21,7 +21,7 @@ function productCardHTML(p) {
     : (p.tag ? `<span class="product-tag">${tagLabel(p.tag)}</span>` : "");
 
   const priceHTML = p.compareAt
-    ? `<span class="was">${vennusFormatPrice(p.compareAt)}</span>${vennusFormatPrice(p.price)}`
+    ? `${vennusFormatPrice(p.price)} <span class="was">${vennusFormatPrice(p.compareAt)}</span>`
     : vennusFormatPrice(p.price);
 
   // Real photo if one's been uploaded in the admin; placeholder otherwise.
@@ -124,7 +124,7 @@ function renderProductDetail() {
 
   const priceEl = document.getElementById("pdpPrice");
   priceEl.innerHTML = product.compareAt
-    ? `<span class="was">${vennusFormatPrice(product.compareAt)}</span>${vennusFormatPrice(product.price)}`
+    ? `${vennusFormatPrice(product.price)} <span class="was">${vennusFormatPrice(product.compareAt)}</span>`
     : vennusFormatPrice(product.price);
 
   const detailsList = document.getElementById("pdpDetailsList");

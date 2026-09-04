@@ -847,7 +847,7 @@ body.hero-page.header-light .site-header:not(.is-solid):not(.menu-open) .hamburg
 .product-info h3 { font-size: 1.02rem; font-weight: 400; margin-bottom: 4px; }
 .product-category { font-size: 0.76rem; color: var(--beton); margin-bottom: 6px; }
 .product-price { font-size: 0.9rem; }
-.product-price .was { text-decoration: line-through; color: var(--beton); margin-right: 8px; font-size: 0.82rem; }
+.was { text-decoration: line-through; color: var(--beton); margin-left: 8px; font-size: 0.82rem; }
 
 /* -----------------------------------------------------------------
    13. PRODUCT DETAIL PAGE
