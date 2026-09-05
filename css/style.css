@@ -281,15 +281,18 @@ textarea:focus-visible {
 }
 
 /* -----------------------------------------------------------------
-   TRANSPARENT HEADER OVER THE HERO
+   TRANSLUCENT HEADER OVER THE HERO
    Pages that open with a hero image/video carry class="hero-page" on
    <body>. The hero is pulled up underneath the nav so the media runs
-   edge to edge behind it, and the bar itself is see-through until you
-   scroll — at which point it fades to solid so the links stay legible.
+   edge to edge behind it, and the bar itself is a frosted, translucent
+   white (so the image still shows through softly, à la Hermès) until
+   you scroll past the hero — at which point it becomes fully solid.
    ----------------------------------------------------------------- */
 body.hero-page .site-header {
-  background: transparent;
-  border-bottom-color: transparent;
+  background: rgba(250, 247, 241, 0.72);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-bottom-color: rgba(59, 44, 32, 0.08);
 }
 
 body.hero-page .hero {
