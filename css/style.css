@@ -820,6 +820,38 @@ body.hero-page.header-light .site-header:not(.is-solid):not(.menu-open) .hamburg
 }
 .editorial-copy p { color: var(--beton); margin: 18px 0 26px; }
 
+/* -----------------------------------------------------------------
+   SHOP BY CATEGORY (Hermès-style tile grid: image, small-caps label
+   below, no border/box — the picture and the label are the whole
+   affordance, same as Hermès's homepage category row)
+   ----------------------------------------------------------------- */
+.category-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 28px 20px;
+}
+.category-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  color: var(--umber);
+}
+.category-tile .placeholder-block {
+  aspect-ratio: 1 / 1;
+  min-height: 0;
+  width: 100%;
+  transition: opacity 0.25s var(--ease);
+}
+.category-tile:hover .placeholder-block { opacity: 0.85; }
+.category-tile-label {
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-align: center;
+  color: var(--umber);
+}
+.category-tile:hover .category-tile-label { color: var(--chai); }
+
 .value-strip {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -1137,6 +1169,7 @@ site-footer, .site-footer { display: block; background: var(--blanc); }
   .logo { font-size: 1.4rem; letter-spacing: 0.1em; }
   .container { padding: 0 20px; }
   .product-grid { grid-template-columns: repeat(2, 1fr); gap: 24px 16px; }
+  .category-grid { grid-template-columns: repeat(2, 1fr); gap: 24px 16px; }
   .editorial-split { grid-template-columns: 1fr; }
   .editorial-copy { padding: var(--gap-lg) 24px; }
   .hero-content { padding: 0 24px 52px; }
