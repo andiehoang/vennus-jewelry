@@ -147,6 +147,13 @@
       .vn-crop-frame img, .vn-crop-frame video {
         position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none;
       }
+      .vn-resize-handle {
+        position: absolute; left: 50%; bottom: -3px; transform: translateX(-50%);
+        width: 44px; height: 10px; background: #3B2C20; border-radius: 5px;
+        cursor: ns-resize; z-index: 5; touch-action: none;
+        box-shadow: 0 0 0 2px #FAF7F1;
+      }
+      .vn-resize-hint { font-size: .74rem; color: #8D8477; margin-top: 14px; }
       .vn-crop-controls { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
       .vn-crop-controls button.vn-zoom-btn {
         width: 30px; height: 30px; border: 1px solid #3B2C20; background: none; color: #3B2C20;
@@ -190,14 +197,35 @@
      aspect ratio it will actually render at.
 
      opts:
-       aspectRatio  — width/height number the crop frame should match
-       existingMedia — { url, type, position, zoom } to jump straight
-                        to the crop step on an already-chosen file
-                        (used when re-framing a photo that's already
-                        part of a product, rather than replacing it)
-       onSave(media) — called with { url, type, position, zoom }
+       aspectRatio  — width/height number the crop frame should start at
+       existingMedia — { url, type, position, zoom, heightOverride } to
+                        jump straight to the crop step on an already-
+                        chosen file (used when re-framing a photo
+                        that's already part of a product, or already
+                        set for a settings slot)
+       onSave(media) — called with { url, type, position, zoom,
+                        heightOverride } (heightOverride only present
+                        when resizable is true and it's been dragged)
+       resizable    — true to show a drag handle that changes the
+                       frame's HEIGHT (width is always dictated by
+                       where it sits in the layout — a hero always
+                       spans the full page, an editorial photo is
+                       always half its row — so height is the one
+                       dimension that's actually free to adjust here)
+       resizeUnit   — "vh" | "px" | "ratio", how heightOverride is
+                       measured, matching whatever CSS mechanism the
+                       destination actually uses:
+                         vh    — .hero's own height (viewport-relative)
+                         px    — editorial's min-height (a fixed
+                                 absolute number regardless of column
+                                 width, same as it already is by default)
+                         ratio — mega-feature's aspect-ratio (width-
+                                 independent by definition, so it
+                                 transfers correctly even though this
+                                 modal's frame renders narrower than
+                                 the real spot on the live page)
      ================================================================= */
-  function openPickCropModal({ aspectRatio, existingMedia, onSave }) {
+  function openPickCropModal({ aspectRatio, existingMedia, onSave, resizable, resizeUnit }) {
     let items = [];
     const loadItems = adminApi("/media").then(r => { items = r; }).catch(() => {});
 
@@ -211,8 +239,9 @@
         </div>
       </div>
       <div id="vnStep2" style="display:none;">
-        <p style="font-size:.85rem; font-weight:500;">Drag to reposition, scroll (or use the buttons) to zoom</p>
+        <p style="font-size:.85rem; font-weight:500;">Drag to reposition, scroll (or use the buttons) to zoom${resizable ? " — drag the bar underneath to make it shorter or taller" : ""}</p>
         <div class="vn-crop-frame" id="vnCropFrame"></div>
+        ${resizable ? '<p class="vn-resize-hint">↕ Drag the bar just below the image to resize its height.</p>' : ""}
         <div class="vn-crop-controls">
           <button type="button" class="vn-zoom-btn" id="vnZoomOut">−</button>
           <input type="range" id="vnZoomSlider" min="100" max="300" value="100" step="1">
@@ -239,6 +268,20 @@
 
     let pending = null; // { url, type }
     let posX = 50, posY = 50, zoom = 1;
+    let heightOverride = null; // set only if the resize handle gets dragged
+
+    // A reference width to translate the modal's (narrower) frame into
+    // the real site's proportions when resizeUnit is "px" or "ratio" —
+    // both of those are meant to describe the destination's ACTUAL
+    // size/shape, not the modal's. "vh" doesn't need this since it's
+    // viewport-relative regardless of any element's width.
+    function frameHeightFromOverride(frame, override) {
+      if (!override) return aspectRatio ? frame.clientWidth / aspectRatio : frame.clientWidth * (9 / 16);
+      if (resizeUnit === "vh") return (parseFloat(override) / 100) * window.innerHeight;
+      if (resizeUnit === "px") return parseFloat(override);
+      if (resizeUnit === "ratio") return frame.clientWidth / parseFloat(override);
+      return frame.clientWidth * (9 / 16);
+    }
 
     function showStep2(media) {
       pending = media;
@@ -246,17 +289,55 @@
       posX = parsed ? +parsed[1] : 50;
       posY = parsed ? +parsed[3] : 50;
       zoom = media.zoom || 1;
+      heightOverride = media.heightOverride || null;
 
       overlay.querySelector("#vnStep1").style.display = "none";
       overlay.querySelector("#vnStep2").style.display = "block";
 
       const frame = overlay.querySelector("#vnCropFrame");
-      if (aspectRatio) frame.style.aspectRatio = `${aspectRatio}`;
       frame.innerHTML = media.type === "video"
         ? `<video src="${media.url}" muted loop autoplay playsinline></video>`
         : `<img src="${media.url}" draggable="false">`;
+
+      if (resizable) {
+        frame.style.aspectRatio = "";
+        frame.style.height = frameHeightFromOverride(frame, heightOverride) + "px";
+        const handle = document.createElement("div");
+        handle.className = "vn-resize-handle";
+        handle.id = "vnResizeHandle";
+        frame.appendChild(handle);
+        wireResizeHandle(frame, handle);
+      } else if (aspectRatio) {
+        frame.style.aspectRatio = `${aspectRatio}`;
+      }
+
       renderTransform();
       wireCropInteraction(frame);
+    }
+
+    function wireResizeHandle(frame, handle) {
+      let resizing = false, startY = 0, startHeight = 0;
+      const MIN_H = 100, MAX_H = 640;
+      const onDown = (clientY) => { resizing = true; startY = clientY; startHeight = frame.getBoundingClientRect().height; };
+      const onMove = (clientY) => {
+        if (!resizing) return;
+        const newHeight = Math.min(MAX_H, Math.max(MIN_H, startHeight + (clientY - startY)));
+        frame.style.height = newHeight + "px";
+      };
+      const onUp = () => {
+        if (!resizing) return;
+        resizing = false;
+        const h = frame.getBoundingClientRect().height;
+        if (resizeUnit === "vh") heightOverride = ((h / window.innerHeight) * 100).toFixed(1) + "vh";
+        else if (resizeUnit === "px") heightOverride = Math.round(h) + "px";
+        else if (resizeUnit === "ratio") heightOverride = (frame.clientWidth / h).toFixed(4);
+      };
+      handle.addEventListener("mousedown", e => { e.preventDefault(); e.stopPropagation(); onDown(e.clientY); });
+      window.addEventListener("mousemove", e => onMove(e.clientY));
+      window.addEventListener("mouseup", onUp);
+      handle.addEventListener("touchstart", e => { e.stopPropagation(); onDown(e.touches[0].clientY); }, { passive: true });
+      handle.addEventListener("touchmove", e => onMove(e.touches[0].clientY), { passive: true });
+      handle.addEventListener("touchend", onUp);
     }
 
     function renderTransform() {
@@ -288,10 +369,10 @@
       };
       const onUp = () => { dragging = false; frame.classList.remove("dragging"); };
 
-      frame.addEventListener("mousedown", e => { e.preventDefault(); onDown(e.clientX, e.clientY); });
+      frame.addEventListener("mousedown", e => { if (e.target.closest(".vn-resize-handle")) return; e.preventDefault(); onDown(e.clientX, e.clientY); });
       window.addEventListener("mousemove", e => onMove(e.clientX, e.clientY));
       window.addEventListener("mouseup", onUp);
-      frame.addEventListener("touchstart", e => { const t = e.touches[0]; onDown(t.clientX, t.clientY); }, { passive: true });
+      frame.addEventListener("touchstart", e => { if (e.target.closest(".vn-resize-handle")) return; const t = e.touches[0]; onDown(t.clientX, t.clientY); }, { passive: true });
       frame.addEventListener("touchmove", e => { const t = e.touches[0]; onMove(t.clientX, t.clientY); }, { passive: true });
       frame.addEventListener("touchend", onUp);
       frame.addEventListener("wheel", e => { e.preventDefault(); setZoom(zoom - e.deltaY * 0.0015); }, { passive: false });
@@ -300,7 +381,15 @@
     overlay.querySelector("#vnZoomIn").onclick = () => setZoom(zoom + 0.2);
     overlay.querySelector("#vnZoomOut").onclick = () => setZoom(zoom - 0.2);
     overlay.querySelector("#vnZoomSlider").addEventListener("input", e => setZoom(e.target.value / 100));
-    overlay.querySelector("#vnResetCrop").onclick = () => { posX = 50; posY = 50; zoom = 1; renderTransform(); };
+    overlay.querySelector("#vnResetCrop").onclick = () => {
+      posX = 50; posY = 50; zoom = 1;
+      if (resizable) {
+        heightOverride = null;
+        const frame = overlay.querySelector("#vnCropFrame");
+        frame.style.height = frameHeightFromOverride(frame, null) + "px";
+      }
+      renderTransform();
+    };
 
     async function handleFiles(files) {
       const file = files[0];
@@ -322,7 +411,7 @@
     });
 
     overlay.querySelector("#vnSaveImage").onclick = () => {
-      onSave({ url: pending.url, type: pending.type, position: `${posX}% ${posY}%`, zoom });
+      onSave({ url: pending.url, type: pending.type, position: `${posX}% ${posY}%`, zoom, ...(resizable ? { heightOverride } : {}) });
       close();
     };
 
@@ -330,14 +419,33 @@
     if (existingMedia) showStep2(existingMedia);
   }
 
+  /* Which spots get the height-resize handle, and what unit their
+     underlying CSS actually uses — see openPickCropModal's "resizable"
+     option for why width is never adjustable here (it's always fixed
+     by the surrounding layout) and why product photos / category
+     tiles are deliberately absent (a grid needs every item the same
+     shape, or it looks broken — this is only for one-off spots). */
+  const RESIZE_CONFIG = {
+    hero_home: "vh", hero_maison: "vh",
+    home_editorial_1: "px", home_editorial_2: "px",
+    maison_editorial_1: "px", maison_editorial_2: "px",
+    mega_feature_jewelry: "ratio", mega_feature_maison: "ratio"
+  };
+
   /* Every [data-editable-image] spot (hero banners, editorial photos,
      mega-menu features) uses the shared modal above, matching its own
      live aspect ratio and saving straight to Settings. */
-  function openImageEditor(el) {
+  async function openImageEditor(el) {
     const key = el.dataset.editableImage;
     const rect = el.getBoundingClientRect();
+    let existingMedia = null;
+    try { existingMedia = (await adminApi("/settings"))[key] || null; } catch {}
+
     openPickCropModal({
       aspectRatio: rect.width && rect.height ? rect.width / rect.height : 16 / 9,
+      existingMedia,
+      resizable: !!RESIZE_CONFIG[key],
+      resizeUnit: RESIZE_CONFIG[key],
       onSave: async (media) => {
         try {
           await adminApi("/settings", { method: "PUT", body: JSON.stringify({ [key]: media }) });

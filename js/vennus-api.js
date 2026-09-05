@@ -106,6 +106,23 @@ async function vennusLoadCatalogue() {
         ? `<video autoplay muted loop playsinline style="width:100%; height:100%; object-fit:cover; object-position:${position}; display:block;${extra}"><source src="${media.url}"></video>`
         : `<img src="${media.url}" alt="" style="width:100%; height:100%; object-fit:cover; object-position:${position}; display:block;${extra}">`;
       if (pencil) el.appendChild(pencil);
+
+      // Optional per-instance height (hero/editorial/mega-feature only
+      // — see openPickCropModal's "resizable" option in the admin bar).
+      // The unit is read from the stored string's own suffix rather
+      // than needing a separate field: "vh" -> the .hero section's own
+      // height; "px" -> an editorial photo's min-height; a bare number
+      // -> an aspect-ratio (mega-feature, or anything else that
+      // normally has a fixed one).
+      if (media.heightOverride) {
+        const target = el.matches(".hero .placeholder-block") ? el.closest(".hero") : el;
+        const v = String(media.heightOverride);
+        if (target) {
+          if (v.endsWith("vh")) target.style.height = v;
+          else if (v.endsWith("px")) target.style.minHeight = v;
+          else target.style.aspectRatio = v;
+        }
+      }
     };
     document.querySelectorAll("[data-editable-image]").forEach(el => {
       window.vennusApplyEditableImage(el, s[el.dataset.editableImage]);
