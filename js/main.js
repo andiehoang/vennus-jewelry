@@ -18,19 +18,31 @@ document.addEventListener("DOMContentLoaded", () => {
      Measures the real header height (so the hero can be pulled up
      behind it by exactly the right amount, at any screen size) and
      fades the bar to solid once the page is scrolled.
+
+     The solidify point is measured against the hero itself (roughly
+     "once you've scrolled past it"), not a flat pixel count — a flat
+     threshold meant the bar turned solid and cut into the image
+     almost the instant you started scrolling, since the non-sticky
+     topbar above it is itself only ~40px tall and scrolls away
+     first. This way the header stays see-through for the hero's
+     full height, on any screen size, and only solidifies once real
+     page content is what's actually underneath it.
      --------------------------------------------------------------- */
   const siteHeader = document.querySelector(".site-header");
+  const heroEl = document.querySelector(".hero");
+  let solidThreshold = 40;
 
   function syncHeaderHeight() {
     if (!siteHeader) return;
     document.documentElement.style.setProperty("--header-h", siteHeader.offsetHeight + "px");
+    solidThreshold = heroEl ? Math.max(40, heroEl.offsetHeight - siteHeader.offsetHeight) : 40;
   }
   syncHeaderHeight();
   window.addEventListener("resize", syncHeaderHeight);
 
   function syncHeaderSolid() {
     if (!siteHeader) return;
-    siteHeader.classList.toggle("is-solid", window.scrollY > 40);
+    siteHeader.classList.toggle("is-solid", window.scrollY > solidThreshold);
   }
   syncHeaderSolid();
   window.addEventListener("scroll", syncHeaderSolid, { passive: true });
