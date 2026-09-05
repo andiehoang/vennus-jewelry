@@ -18,7 +18,7 @@
 /* ── SET THIS to your deployed admin URL ──────────────────────────
    Local testing:  http://localhost:4000
    Once deployed:  https://your-app.onrender.com                  */
-const VENNUS_API = "https://vennus-admin.onrender.com";
+const VENNUS_API = "https://vennus-admin-v2.onrender.com";
 
 /* ---------- Anonymous session id (no personal data) ---------- */
 function vennusSession() {
