@@ -785,7 +785,8 @@ body.hero-page.header-light .site-header:not(.is-solid):not(.menu-open) .hamburg
   inset: 0;
   z-index: 1;
   display: flex;
-  align-items: flex-end;
+  flex-direction: column;
+  justify-content: flex-end;
   padding: 0 40px 72px;
   width: 100%;
   color: var(--umber);
