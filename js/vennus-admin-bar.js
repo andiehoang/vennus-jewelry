@@ -183,6 +183,18 @@
       .vn-crop-controls input[type="range"] { flex: 1; }
       .vn-crop-hint { font-size: .74rem; color: #8D8477; margin-top: 6px; }
 
+      /* Pan/zoom stage for LOCKED-shape spots (hero, category tiles,
+         product photos) — a fixed-ratio frame you drag the photo
+         within, drawn straight to a canvas so it's a genuine crop
+         (not a CSS position on the full-size original) at whatever
+         output size the caller asked for. */
+      .vn-pz-stage {
+        width: 100%; max-width: 560px; margin: 12px auto 0; background: #EDE3D3;
+        position: relative; overflow: hidden; cursor: grab; touch-action: none; user-select: none;
+      }
+      .vn-pz-stage.dragging { cursor: grabbing; }
+      .vn-pz-stage canvas { display: block; width: 100%; height: 100%; pointer-events: none; }
+
       .vn-photo-list { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 10px 0; }
       .vn-photo-list .item { position: relative; aspect-ratio: 1; background: #EDE3D3; overflow: hidden; }
       .vn-photo-list .item img { width: 100%; height: 100%; object-fit: cover; }
@@ -214,74 +226,44 @@
      PICK + CROP — one reusable modal used everywhere a single photo or
      video needs choosing/uploading and framing: hero banners, editorial
      photos, mega-menu features, and each individual product photo.
-     Framing is real drag-to-pan / scroll-to-zoom against the exact
-     aspect ratio it will actually render at.
+
+     Two crop styles, depending on lockAspect:
+
+     LOCKED (hero, category tiles, product photos — every item needs a
+     consistent shape): a fixed-ratio frame; you drag the PHOTO itself
+     to reposition it and scroll/use the buttons to zoom, same feel as
+     a classic pan-and-zoom tool. Saving draws the exact visible view
+     onto a canvas at outputWidth × outputHeight and uploads that — a
+     real, firmly-sized file, not the original with a CSS position on it.
+
+     FREE (editorial photos, menu features — nothing else needs to
+     match them): the full photo is shown and you drag a resizable
+     selection box over the part you want, like a normal photo editor's
+     crop tool. Saving redraws just that selection onto a canvas.
+
+     VIDEO can't be cropped either way in a browser, so it keeps a
+     pan-to-reposition / scroll-to-zoom treatment and uploads the
+     original file (lazily, at Save) rather than a cropped one.
 
      opts:
-       aspectRatio  — width/height number the crop frame should start at
-       existingMedia — { url, type, position, zoom, heightOverride } to
-                        jump straight to the crop step on an already-
-                        chosen file (used when re-framing a photo
-                        that's already part of a product, or already
-                        set for a settings slot)
-       onSave(media) — called with { url, type, position, zoom,
-                        heightOverride } (heightOverride only present
-                        when resizable is true and it's been dragged)
-       resizable    — true to show a drag handle that changes the
-                       frame's HEIGHT (width is always dictated by
-                       where it sits in the layout — a hero always
-                       spans the full page, an editorial photo is
-                       always half its row — so height is the one
-                       dimension that's actually free to adjust here)
-       resizeUnit   — "vh" | "px" | "ratio", how heightOverride is
-                       measured, matching whatever CSS mechanism the
-                       destination actually uses:
-                         vh    — .hero's own height (viewport-relative)
-                         px    — editorial's min-height (a fixed
-                                 absolute number regardless of column
-                                 width, same as it already is by default)
-                         ratio — mega-feature's aspect-ratio (width-
-                                 independent by definition, so it
-                                 transfers correctly even though this
-                                 modal's frame renders narrower than
-                                 the real spot on the live page)
-     ================================================================= */
-  /* =================================================================
-     PICK + CROP — one reusable modal used everywhere a single photo or
-     video needs choosing/uploading and framing: hero banners, editorial
-     photos, mega-menu features, and each individual product photo.
-
-     For IMAGES, this is a genuine crop: the full photo is shown and you
-     drag a resizable selection box over the part you want, exactly like
-     a normal photo editor's crop tool. Saving redraws just that
-     selection onto a canvas and uploads it as a brand-new, actually
-     smaller file — nothing is faked with CSS positioning, so the file
-     itself really is cropped from then on.
-
-     VIDEO can't be cropped this way in a browser, so it keeps the
-     previous pan-to-reposition / scroll-to-zoom treatment instead.
-
-     opts:
-       aspectRatio  — width/height number the crop box starts at (and,
-                      if lockAspect is true, is locked to)
-       lockAspect   — true to keep the box's shape fixed while resizing
-                      (product photos, category tiles — every item in
-                      those grids needs to match its neighbors). Left
-                      false/omitted, the box can be resized to any
-                      shape (a hero, an editorial photo, a menu feature
-                      — nothing else needs to match it, so a genuinely
-                      free crop is the more honest tool for those)
+       aspectRatio   — width/height number the frame/box starts at
+                       (and, if lockAspect is true, is locked to)
+       lockAspect    — true for a fixed-shape pan/zoom frame; false or
+                       omitted for a freely resizable box
+       outputWidth,
+       outputHeight  — pixel size to render the final crop at, for
+                       locked spots (defaults to a reasonable size
+                       matching aspectRatio if omitted)
        existingMedia — { url, type } to jump straight to the crop step
                         on an already-chosen file (re-cropping a photo
                         that's already part of a product, or already
                         set for a settings slot — this crops whatever
                         is currently saved further, same as opening an
                         already-cropped photo in any other editor)
-       onSave(media) — called with { url, type } — a freshly uploaded,
-                        already-cropped file for images; for video,
-                        { url, type, position, zoom } as before
+       onSave(media) — called with { url, type } for images; for
+                        video, { url, type, position, zoom }
      ================================================================= */
-  function openPickCropModal({ aspectRatio, lockAspect, existingMedia, onSave }) {
+  function openPickCropModal({ aspectRatio, lockAspect, outputWidth, outputHeight, existingMedia, onSave }) {
     const { overlay, close } = openModal(`
       <h3 id="vnModalTitle">${existingMedia ? "Adjust framing" : "Choose an image or video"}</h3>
       <div id="vnStep1">
@@ -293,7 +275,7 @@
       <div id="vnStep2" style="display:none;">
         <p style="font-size:.85rem; font-weight:500;" id="vnStep2Hint"></p>
         <div id="vnStep2Stage"></div>
-        <div class="vn-crop-controls" id="vnVideoControls" style="display:none;">
+        <div class="vn-crop-controls" id="vnZoomControls" style="display:none;">
           <button type="button" class="vn-zoom-btn" id="vnZoomOut">−</button>
           <input type="range" id="vnZoomSlider" min="100" max="300" value="100" step="1">
           <button type="button" class="vn-zoom-btn" id="vnZoomIn">+</button>
@@ -324,7 +306,7 @@
     function setUpVideoStep(media) {
       overlay.querySelector("#vnStep2Hint").textContent = "Drag to reposition, scroll (or use the buttons) to zoom";
       overlay.querySelector("#vnStep2Note").textContent = "This is exactly how it will be framed on the site.";
-      overlay.querySelector("#vnVideoControls").style.display = "flex";
+      overlay.querySelector("#vnZoomControls").style.display = "flex";
       const stage = overlay.querySelector("#vnStep2Stage");
       stage.innerHTML = `<div class="vn-crop-frame" id="vnCropFrame"></div>`;
       const frame = stage.querySelector("#vnCropFrame");
@@ -386,11 +368,162 @@
     /* ---------- IMAGE: real crop — full photo shown, a resizable
        selection box on top; saving canvas-crops + uploads the result ---------- */
     function setUpImageCropStep(media) {
-      overlay.querySelector("#vnStep2Hint").textContent = lockAspect
-        ? "Drag the box to reposition it, or its corners to resize — this spot needs a consistent shape, so the box keeps its proportions."
-        : "Drag the box to reposition it, or drag a corner to resize it to any shape.";
+      if (lockAspect) setUpLockedPanZoomStep(media);
+      else setUpFreeCropStep(media);
+    }
+
+    /* ---------- LOCKED-SHAPE spots (hero, category tiles, product
+       photos): the frame is a fixed shape, so instead of resizing a
+       box, you drag the PHOTO itself to reposition it and scroll/use
+       the buttons to zoom — exactly like the old pan-and-zoom tool,
+       except this genuinely crops. It's drawn straight to a canvas
+       sized at the output resolution (outputWidth × outputHeight, or
+       a size matching the aspect ratio if not given), so what's saved
+       is a real file at a firm, predictable size — not the original
+       file with a CSS position on it. ---------- */
+    function setUpLockedPanZoomStep(media) {
+      overlay.querySelector("#vnStep2Hint").textContent = "Drag the photo to reposition it, scroll (or use the buttons) to zoom.";
+      overlay.querySelector("#vnStep2Note").textContent = "Saving crops the photo to exactly this view — a real, smaller file, not just a repositioned view of the original.";
+      overlay.querySelector("#vnZoomControls").style.display = "flex";
+      const stage = overlay.querySelector("#vnStep2Stage");
+      stage.innerHTML = `<div class="vn-pz-stage" id="vnPzStage" style="aspect-ratio:${aspectRatio};"><canvas id="vnPzCanvas"></canvas></div>`;
+      const pzStage = stage.querySelector("#vnPzStage");
+      const canvas = stage.querySelector("#vnPzCanvas");
+      const ctx = canvas.getContext("2d");
+      const img = new Image();
+
+      let view = null; // { sx, sy, sw, sh } — the visible rectangle, in the SOURCE photo's own natural pixels
+      let ready = false;
+
+      function draw() {
+        if (!ready) return;
+        const dispW = pzStage.clientWidth, dispH = pzStage.clientHeight;
+        canvas.width = dispW; canvas.height = dispH;
+        ctx.clearRect(0, 0, dispW, dispH);
+        ctx.drawImage(img, view.sx, view.sy, view.sw, view.sh, 0, 0, dispW, dispH);
+      }
+
+      // The widest/tallest the view can be while still matching the
+      // locked ratio and fitting inside the actual photo — i.e. "no
+      // zoom", the most that's ever visible at once.
+      function fitSize() {
+        const iw = img.naturalWidth, ih = img.naturalHeight;
+        return (iw / ih > aspectRatio) ? { w: ih * aspectRatio, h: ih } : { w: iw, h: iw / aspectRatio };
+      }
+
+      function initView() {
+        const fit = fitSize();
+        view = { sx: (img.naturalWidth - fit.w) / 2, sy: (img.naturalHeight - fit.h) / 2, sw: fit.w, sh: fit.h };
+        ready = true;
+        overlay.querySelector("#vnZoomSlider").value = 100;
+        draw();
+      }
+
+      // Changes zoom by targeting a new view WIDTH (in source pixels)
+      // — smaller = more zoomed in — keeping the current center point
+      // fixed, clamped between "fully zoomed out" (the whole photo)
+      // and a sensible minimum so it can't be zoomed into a handful
+      // of pixels.
+      function setViewWidth(newSw) {
+        if (!ready) return;
+        const fit = fitSize();
+        newSw = Math.min(fit.w, Math.max(fit.w * 0.12, newSw));
+        const newSh = newSw / aspectRatio;
+        const cx = view.sx + view.sw / 2, cy = view.sy + view.sh / 2;
+        view.sw = newSw; view.sh = newSh;
+        view.sx = Math.min(img.naturalWidth - newSw, Math.max(0, cx - newSw / 2));
+        view.sy = Math.min(img.naturalHeight - newSh, Math.max(0, cy - newSh / 2));
+        overlay.querySelector("#vnZoomSlider").value = Math.round(Math.min(300, Math.max(100, (fit.w / newSw) * 100)));
+        draw();
+      }
+
+      let dragging = false, lastX = 0, lastY = 0;
+      const onDown = (x, y) => { dragging = true; lastX = x; lastY = y; pzStage.classList.add("dragging"); };
+      const onMove = (x, y) => {
+        if (!dragging || !ready) return;
+        const dispW = pzStage.clientWidth, dispH = pzStage.clientHeight;
+        const dx = (x - lastX) * (view.sw / dispW), dy = (y - lastY) * (view.sh / dispH);
+        view.sx = Math.min(img.naturalWidth - view.sw, Math.max(0, view.sx - dx));
+        view.sy = Math.min(img.naturalHeight - view.sh, Math.max(0, view.sy - dy));
+        lastX = x; lastY = y;
+        draw();
+      };
+      const onUp = () => { dragging = false; pzStage.classList.remove("dragging"); };
+      pzStage.addEventListener("mousedown", e => { e.preventDefault(); onDown(e.clientX, e.clientY); });
+      window.addEventListener("mousemove", e => onMove(e.clientX, e.clientY));
+      window.addEventListener("mouseup", onUp);
+      pzStage.addEventListener("touchstart", e => { const t = e.touches[0]; onDown(t.clientX, t.clientY); }, { passive: true });
+      pzStage.addEventListener("touchmove", e => { const t = e.touches[0]; onMove(t.clientX, t.clientY); }, { passive: true });
+      pzStage.addEventListener("touchend", onUp);
+      pzStage.addEventListener("wheel", e => { e.preventDefault(); if (ready) setViewWidth(view.sw * (1 + e.deltaY * 0.0015)); }, { passive: false });
+
+      overlay.querySelector("#vnZoomIn").onclick = () => ready && setViewWidth(view.sw * 0.85);
+      overlay.querySelector("#vnZoomOut").onclick = () => ready && setViewWidth(view.sw * 1.15);
+      overlay.querySelector("#vnZoomSlider").oninput = e => {
+        if (!ready) return;
+        setViewWidth(fitSize().w * (100 / +e.target.value));
+      };
+      overlay.querySelector("#vnResetCrop").onclick = () => initView();
+
+      const onImgReady = () => {
+        const loadingNote = stage.querySelector("#vnPzLoading");
+        if (loadingNote) loadingNote.remove();
+        initView();
+      };
+      let loadAttempt = 0;
+      const onImgError = () => {
+        loadAttempt++;
+        if (loadAttempt >= 14) {
+          const loadingNote = stage.querySelector("#vnPzLoading");
+          if (loadingNote) loadingNote.textContent = "This photo isn't loading — try \"Choose a different file\" and pick it again in a moment.";
+          return;
+        }
+        setTimeout(() => {
+          img.src = media.url + (media.url.includes("?") ? "&" : "?") + "retry=" + loadAttempt;
+        }, Math.min(5000, loadAttempt * 800));
+      };
+      img.addEventListener("load", onImgReady);
+      img.addEventListener("error", onImgError);
+      if (!(img.complete && img.naturalWidth)) {
+        const loadingNote = document.createElement("p");
+        loadingNote.id = "vnPzLoading";
+        loadingNote.style.cssText = "font-size:.8rem; color:#8D8477; padding:24px; text-align:center; position:absolute; inset:0; margin:0; display:flex; align-items:center; justify-content:center;";
+        loadingNote.textContent = "Loading photo…";
+        pzStage.appendChild(loadingNote);
+      }
+      img.src = media.url;
+
+      saveHandler = async () => {
+        const saveBtn = overlay.querySelector("#vnSaveImage");
+        saveBtn.disabled = true;
+        saveBtn.textContent = "Cropping…";
+        try {
+          const outCanvas = document.createElement("canvas");
+          outCanvas.width = outputWidth || 1600;
+          outCanvas.height = outputHeight || Math.round(outCanvas.width / aspectRatio);
+          outCanvas.getContext("2d").drawImage(img, view.sx, view.sy, view.sw, view.sh, 0, 0, outCanvas.width, outCanvas.height);
+          const blob = await new Promise(resolve => outCanvas.toBlob(resolve, "image/jpeg", 0.9));
+          const fd = new FormData();
+          fd.append("files", new File([blob], `cropped-${Date.now()}.jpg`, { type: "image/jpeg" }));
+          const r = await adminApi("/media", { method: "POST", body: fd });
+          onSave({ url: r.files[0].url, type: "image" });
+          close();
+        } catch (err) {
+          alert("Couldn't save the crop: " + err.message);
+          saveBtn.disabled = false;
+          saveBtn.textContent = "Save";
+        }
+      };
+    }
+
+    /* ---------- FREE-SHAPE spots (editorial photos, menu features):
+       the full photo is shown and you drag a resizable selection box
+       over the part you want — no locked ratio, so a box you resize
+       makes more sense here than a fixed frame you pan within. ---------- */
+    function setUpFreeCropStep(media) {
+      overlay.querySelector("#vnStep2Hint").textContent = "Drag the box to reposition it, or drag a corner to resize it to any shape.";
       overlay.querySelector("#vnStep2Note").textContent = "Saving crops the photo to exactly this selection — a real, smaller file, not just a repositioned view of the original.";
-      overlay.querySelector("#vnVideoControls").style.display = "none";
+      overlay.querySelector("#vnZoomControls").style.display = "none";
       const stage = overlay.querySelector("#vnStep2Stage");
       stage.innerHTML = `
         <div class="vn-crop-stage" id="vnCropStage">
@@ -487,20 +620,10 @@
             const W = cropStage.clientWidth, H = cropStage.clientHeight;
             const dx = x - startX, dy = y - startY;
             let { x: bx, y: by, w, h } = start;
-
-            if (lockAspect) {
-              const ratio = aspectRatio || (start.w / start.h);
-              const deltaW = type.includes("e") ? dx : -dx;
-              w = Math.max(MIN, start.w + deltaW);
-              h = w / ratio;
-              if (type.includes("w")) bx = start.x + start.w - w;
-              if (type.includes("n")) by = start.y + start.h - h;
-            } else {
-              if (type.includes("e")) w = Math.max(MIN, start.w + dx);
-              if (type.includes("w")) { w = Math.max(MIN, start.w - dx); bx = start.x + start.w - w; }
-              if (type.includes("s")) h = Math.max(MIN, start.h + dy);
-              if (type.includes("n")) { h = Math.max(MIN, start.h - dy); by = start.y + start.h - h; }
-            }
+            if (type.includes("e")) w = Math.max(MIN, start.w + dx);
+            if (type.includes("w")) { w = Math.max(MIN, start.w - dx); bx = start.x + start.w - w; }
+            if (type.includes("s")) h = Math.max(MIN, start.h + dy);
+            if (type.includes("n")) { h = Math.max(MIN, start.h - dy); by = start.y + start.h - h; }
 
             bx = Math.max(0, bx); by = Math.max(0, by);
             if (bx + w > W) w = W - bx;
@@ -576,17 +699,21 @@
   }
 
   /* Spots that always need the SAME shape every time a photo is set,
-     so the crop box is locked to a fixed ratio instead of the live
-     rendered rect (which would just describe whatever's already
-     there, not what's actually required): a category tile needs to
-     match its grid neighbors (square), and the hero is meant to be a
-     consistent, cinematic banner every time — not a different shape
-     each time someone crops a new photo in. Editorial photos and menu
+     so the crop is a fixed ratio instead of the live rendered rect
+     (which would just describe whatever's already there, not what's
+     actually required): a category tile needs to match its grid
+     neighbors (square), and the hero is meant to be a firm, consistent
+     banner size every time — 1920×1080 — not a different shape each
+     time someone crops a new photo in. Editorial photos and menu
      features have no such constraint, so those stay a genuinely
      free-shaped crop, sized off whatever's live on the page right now. */
   const LOCKED_ASPECT = {
-    category_necklaces: 1, category_earrings: 1, category_bracelets: 1, category_rings: 1,
-    hero_home: 21 / 9, hero_maison: 21 / 9
+    category_necklaces: { ratio: 1, outW: 1200, outH: 1200 },
+    category_earrings: { ratio: 1, outW: 1200, outH: 1200 },
+    category_bracelets: { ratio: 1, outW: 1200, outH: 1200 },
+    category_rings: { ratio: 1, outW: 1200, outH: 1200 },
+    hero_home: { ratio: 16 / 9, outW: 1920, outH: 1080 },
+    hero_maison: { ratio: 16 / 9, outW: 1920, outH: 1080 }
   };
 
   /* Every [data-editable-image] spot (hero banners, editorial photos,
@@ -594,13 +721,16 @@
      matching its own live aspect ratio and saving straight to Settings. */
   async function openImageEditor(el) {
     const key = el.dataset.editableImage;
+    const locked = LOCKED_ASPECT[key];
     const rect = el.getBoundingClientRect();
     let existingMedia = null;
     try { existingMedia = (await adminApi("/settings"))[key] || null; } catch {}
 
     openPickCropModal({
-      aspectRatio: LOCKED_ASPECT[key] || (rect.width && rect.height ? rect.width / rect.height : 16 / 9),
-      lockAspect: key in LOCKED_ASPECT,
+      aspectRatio: locked ? locked.ratio : (rect.width && rect.height ? rect.width / rect.height : 16 / 9),
+      lockAspect: !!locked,
+      outputWidth: locked?.outW,
+      outputHeight: locked?.outH,
       existingMedia,
       onSave: async (media) => {
         try {
@@ -702,6 +832,8 @@
         cropBtn.onclick = () => openPickCropModal({
           aspectRatio: PRODUCT_ASPECT,
         lockAspect: true,
+        outputWidth: 1200,
+        outputHeight: 1500,
           existingMedia: photos[i],
           onSave: (media) => { photos[i] = media; renderList(); }
         });
@@ -714,6 +846,8 @@
       div.onclick = () => openPickCropModal({
         aspectRatio: PRODUCT_ASPECT,
         lockAspect: true,
+        outputWidth: 1200,
+        outputHeight: 1500,
         existingMedia: { url: div.dataset.url, type: div.dataset.type },
         onSave: (media) => { photos.push(media); renderList(); }
       });
@@ -733,6 +867,8 @@
           openPickCropModal({
             aspectRatio: PRODUCT_ASPECT,
         lockAspect: true,
+        outputWidth: 1200,
+        outputHeight: 1500,
             existingMedia: { url: f.url, type: f.type },
             onSave: (media) => { photos.push(media); renderList(); next(); }
           });

@@ -763,7 +763,7 @@ body.hero-page.header-light .site-header:not(.is-solid):not(.menu-open) .hamburg
    ----------------------------------------------------------------- */
 .hero {
   position: relative;
-  aspect-ratio: 21 / 9;
+  aspect-ratio: 16 / 9;
   min-height: 320px;
   overflow: hidden;
 }
@@ -773,7 +773,7 @@ body.hero-page.header-light .site-header:not(.is-solid):not(.menu-open) .hamburg
    Absolutely positioning the placeholder/image to fill that reserved
    box is what actually uses it. */
 .hero .placeholder-block { position: absolute; inset: 0; }
-/* The hero is locked to a fixed cinematic ratio (matching the crop
+/* The hero is locked to a firm 1920×1080 (16:9) shape (matching the crop
    tool's locked box for this spot — see LOCKED_ASPECT in the admin
    bar), so the container reserves that real shape immediately via
    CSS, rather than depending on the image having already loaded to
