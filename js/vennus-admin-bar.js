@@ -148,12 +148,11 @@
         position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none;
       }
       .vn-resize-handle {
-        position: absolute; left: 50%; bottom: -3px; transform: translateX(-50%);
-        width: 44px; height: 10px; background: #3B2C20; border-radius: 5px;
-        cursor: ns-resize; z-index: 5; touch-action: none;
-        box-shadow: 0 0 0 2px #FAF7F1;
+        display: block; width: 44px; height: 10px; margin: 10px auto 0;
+        background: #3B2C20; border-radius: 5px; cursor: ns-resize; touch-action: none;
       }
-      .vn-resize-hint { font-size: .74rem; color: #8D8477; margin-top: 14px; }
+      .vn-resize-handle:hover { background: #B8865A; }
+      .vn-resize-hint { font-size: .74rem; color: #8D8477; margin-top: 8px; }
       .vn-crop-controls { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
       .vn-crop-controls button.vn-zoom-btn {
         width: 30px; height: 30px; border: 1px solid #3B2C20; background: none; color: #3B2C20;
@@ -241,7 +240,7 @@
       <div id="vnStep2" style="display:none;">
         <p style="font-size:.85rem; font-weight:500;">Drag to reposition, scroll (or use the buttons) to zoom${resizable ? " — drag the bar underneath to make it shorter or taller" : ""}</p>
         <div class="vn-crop-frame" id="vnCropFrame"></div>
-        ${resizable ? '<p class="vn-resize-hint">↕ Drag the bar just below the image to resize its height.</p>' : ""}
+        ${resizable ? '<div class="vn-resize-handle" id="vnResizeHandle" title="Drag to resize height"></div><p class="vn-resize-hint">↕ Drag the bar just below the image to resize its height.</p>' : ""}
         <div class="vn-crop-controls">
           <button type="button" class="vn-zoom-btn" id="vnZoomOut">−</button>
           <input type="range" id="vnZoomSlider" min="100" max="300" value="100" step="1">
@@ -302,11 +301,11 @@
       if (resizable) {
         frame.style.aspectRatio = "";
         frame.style.height = frameHeightFromOverride(frame, heightOverride) + "px";
-        const handle = document.createElement("div");
-        handle.className = "vn-resize-handle";
-        handle.id = "vnResizeHandle";
-        frame.appendChild(handle);
-        wireResizeHandle(frame, handle);
+        const handle = overlay.querySelector("#vnResizeHandle");
+        if (handle && !handle.dataset.wired) {
+          wireResizeHandle(frame, handle);
+          handle.dataset.wired = "1";
+        }
       } else if (aspectRatio) {
         frame.style.aspectRatio = `${aspectRatio}`;
       }
