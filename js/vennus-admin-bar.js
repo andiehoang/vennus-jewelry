@@ -411,7 +411,7 @@
       let loadAttempt = 0;
       const onImgError = () => {
         loadAttempt++;
-        if (loadAttempt >= 8) {
+        if (loadAttempt >= 14) {
           const loadingNote = stage.querySelector("#vnCropLoading");
           if (loadingNote) loadingNote.textContent = "This photo isn't loading — try \"Choose a different file\" and pick it again in a moment.";
           return;
@@ -423,7 +423,7 @@
         // the crop step with nothing to show.
         setTimeout(() => {
           cropImg.src = media.url + (media.url.includes("?") ? "&" : "?") + "retry=" + loadAttempt;
-        }, loadAttempt * 800);
+        }, Math.min(5000, loadAttempt * 800));
       };
       if (cropImg.complete && cropImg.naturalWidth) onImgReady();
       else {

@@ -148,8 +148,8 @@ async function vennusLoadCatalogue() {
       probe.onload = reallyApply;
       probe.onerror = () => {
         attempt++;
-        if (attempt >= 6) { reallyApply(); return; }
-        setTimeout(() => { probe.src = media.url + (media.url.includes("?") ? "&" : "?") + "retry=" + attempt; }, attempt * 800);
+        if (attempt >= 14) { reallyApply(); return; }
+        setTimeout(() => { probe.src = media.url + (media.url.includes("?") ? "&" : "?") + "retry=" + attempt; }, Math.min(5000, attempt * 800));
       };
       probe.src = media.url;
     };
