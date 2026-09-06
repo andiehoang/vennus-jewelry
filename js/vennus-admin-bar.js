@@ -159,10 +159,10 @@
          redraws just the selected region onto a canvas and uploads that
          as a brand new, genuinely smaller file — not a CSS trick. */
       .vn-crop-stage {
-        width: 100%; max-height: 60vh; overflow: hidden; background: #EDE3D3;
-        margin-top: 12px; position: relative; user-select: none;
+        display: block; width: fit-content; max-width: 100%; background: #EDE3D3;
+        margin: 12px auto 0; position: relative; user-select: none;
       }
-      .vn-crop-stage img { display: block; width: 100%; height: auto; pointer-events: none; }
+      .vn-crop-stage img { display: block; max-width: 100%; max-height: 60vh; width: auto; height: auto; pointer-events: none; }
       .vn-crop-box {
         position: absolute; border: 2px solid #FAF7F1; cursor: move; touch-action: none;
         box-shadow: 0 0 0 9999px rgba(20, 15, 10, 0.55);
@@ -305,7 +305,7 @@
         <p class="vn-crop-hint" id="vnStep2Note"></p>
         <div class="row">
           <button type="button" class="vn-btn primary" id="vnSaveImage">Save</button>
-          ${existingMedia ? "" : '<button type="button" class="vn-btn" id="vnCancelStep2">Choose a different file</button>'}
+          <button type="button" class="vn-btn" id="vnCancelStep2">Choose a different file</button>
           <button type="button" class="vn-btn" id="vnResetCrop">Reset</button>
         </div>
       </div>
