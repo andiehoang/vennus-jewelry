@@ -767,6 +767,12 @@ body.hero-page.header-light .site-header:not(.is-solid):not(.menu-open) .hamburg
   min-height: 320px;
   overflow: hidden;
 }
+/* Reserving the right SHAPE on .hero itself (above) doesn't make its
+   content actually fill it — a normal-flow child just sits at its own
+   natural height regardless of how much space its parent reserved.
+   Absolutely positioning the placeholder/image to fill that reserved
+   box is what actually uses it. */
+.hero .placeholder-block { position: absolute; inset: 0; }
 /* The hero is locked to a fixed cinematic ratio (matching the crop
    tool's locked box for this spot — see LOCKED_ASPECT in the admin
    bar), so the container reserves that real shape immediately via

@@ -403,9 +403,38 @@
         renderBox();
       }
 
-      const onImgReady = () => { resetBox(); wireBoxDrag(); wireHandles(); };
+      const onImgReady = () => {
+        const loadingNote = stage.querySelector("#vnCropLoading");
+        if (loadingNote) loadingNote.remove();
+        resetBox(); wireBoxDrag(); wireHandles();
+      };
+      let loadAttempt = 0;
+      const onImgError = () => {
+        loadAttempt++;
+        if (loadAttempt >= 8) {
+          const loadingNote = stage.querySelector("#vnCropLoading");
+          if (loadingNote) loadingNote.textContent = "This photo isn't loading — try \"Choose a different file\" and pick it again in a moment.";
+          return;
+        }
+        // A file just uploaded moments ago can take GitHub Pages a
+        // short while to actually start serving — retry a few times
+        // with a growing delay (with a cache-busting query so a
+        // browser-cached 404 doesn't get reused) rather than leaving
+        // the crop step with nothing to show.
+        setTimeout(() => {
+          cropImg.src = media.url + (media.url.includes("?") ? "&" : "?") + "retry=" + loadAttempt;
+        }, loadAttempt * 800);
+      };
       if (cropImg.complete && cropImg.naturalWidth) onImgReady();
-      else cropImg.addEventListener("load", onImgReady, { once: true });
+      else {
+        const loadingNote = document.createElement("p");
+        loadingNote.id = "vnCropLoading";
+        loadingNote.style.cssText = "font-size:.8rem; color:#8D8477; padding:24px; text-align:center;";
+        loadingNote.textContent = "Loading photo…";
+        stage.querySelector("#vnCropStage").appendChild(loadingNote);
+        cropImg.addEventListener("load", onImgReady);
+        cropImg.addEventListener("error", onImgError);
+      }
 
       function wireBoxDrag() {
         let dragging = false, startX = 0, startY = 0, start = null;
