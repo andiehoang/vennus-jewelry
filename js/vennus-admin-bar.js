@@ -153,6 +153,28 @@
       }
       .vn-resize-handle:hover { background: #B8865A; }
       .vn-resize-hint { font-size: .74rem; color: #8D8477; margin-top: 8px; }
+
+      /* Real crop stage — the FULL image is shown (nothing hidden), with
+         a draggable/resizable selection box on top. Saving actually
+         redraws just the selected region onto a canvas and uploads that
+         as a brand new, genuinely smaller file — not a CSS trick. */
+      .vn-crop-stage {
+        width: 100%; max-height: 60vh; overflow: hidden; background: #EDE3D3;
+        margin-top: 12px; position: relative; user-select: none;
+      }
+      .vn-crop-stage img { display: block; width: 100%; height: auto; pointer-events: none; }
+      .vn-crop-box {
+        position: absolute; border: 2px solid #FAF7F1; cursor: move; touch-action: none;
+        box-shadow: 0 0 0 9999px rgba(20, 15, 10, 0.55);
+      }
+      .vn-crop-handle {
+        position: absolute; width: 16px; height: 16px; margin: -8px;
+        background: #FAF7F1; border: 2px solid #3B2C20; border-radius: 50%; touch-action: none;
+      }
+      .vn-crop-handle[data-handle="nw"] { left: 0; top: 0; cursor: nwse-resize; }
+      .vn-crop-handle[data-handle="ne"] { left: 100%; top: 0; cursor: nesw-resize; }
+      .vn-crop-handle[data-handle="sw"] { left: 0; top: 100%; cursor: nesw-resize; }
+      .vn-crop-handle[data-handle="se"] { left: 100%; top: 100%; cursor: nwse-resize; }
       .vn-crop-controls { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
       .vn-crop-controls button.vn-zoom-btn {
         width: 30px; height: 30px; border: 1px solid #3B2C20; background: none; color: #3B2C20;
@@ -224,7 +246,42 @@
                                  modal's frame renders narrower than
                                  the real spot on the live page)
      ================================================================= */
-  function openPickCropModal({ aspectRatio, existingMedia, onSave, resizable, resizeUnit }) {
+  /* =================================================================
+     PICK + CROP — one reusable modal used everywhere a single photo or
+     video needs choosing/uploading and framing: hero banners, editorial
+     photos, mega-menu features, and each individual product photo.
+
+     For IMAGES, this is a genuine crop: the full photo is shown and you
+     drag a resizable selection box over the part you want, exactly like
+     a normal photo editor's crop tool. Saving redraws just that
+     selection onto a canvas and uploads it as a brand-new, actually
+     smaller file — nothing is faked with CSS positioning, so the file
+     itself really is cropped from then on.
+
+     VIDEO can't be cropped this way in a browser, so it keeps the
+     previous pan-to-reposition / scroll-to-zoom treatment instead.
+
+     opts:
+       aspectRatio  — width/height number the crop box starts at (and,
+                      if lockAspect is true, is locked to)
+       lockAspect   — true to keep the box's shape fixed while resizing
+                      (product photos, category tiles — every item in
+                      those grids needs to match its neighbors). Left
+                      false/omitted, the box can be resized to any
+                      shape (a hero, an editorial photo, a menu feature
+                      — nothing else needs to match it, so a genuinely
+                      free crop is the more honest tool for those)
+       existingMedia — { url, type } to jump straight to the crop step
+                        on an already-chosen file (re-cropping a photo
+                        that's already part of a product, or already
+                        set for a settings slot — this crops whatever
+                        is currently saved further, same as opening an
+                        already-cropped photo in any other editor)
+       onSave(media) — called with { url, type } — a freshly uploaded,
+                        already-cropped file for images; for video,
+                        { url, type, position, zoom } as before
+     ================================================================= */
+  function openPickCropModal({ aspectRatio, lockAspect, existingMedia, onSave }) {
     let items = [];
     const loadItems = adminApi("/media").then(r => { items = r; }).catch(() => {});
 
@@ -238,15 +295,14 @@
         </div>
       </div>
       <div id="vnStep2" style="display:none;">
-        <p style="font-size:.85rem; font-weight:500;">Drag to reposition, scroll (or use the buttons) to zoom${resizable ? " — drag the bar underneath to make it shorter or taller" : ""}</p>
-        <div class="vn-crop-frame" id="vnCropFrame"></div>
-        ${resizable ? '<div class="vn-resize-handle" id="vnResizeHandle" title="Drag to resize height"></div><p class="vn-resize-hint">↕ Drag the bar just below the image to resize its height.</p>' : ""}
-        <div class="vn-crop-controls">
+        <p style="font-size:.85rem; font-weight:500;" id="vnStep2Hint"></p>
+        <div id="vnStep2Stage"></div>
+        <div class="vn-crop-controls" id="vnVideoControls" style="display:none;">
           <button type="button" class="vn-zoom-btn" id="vnZoomOut">−</button>
           <input type="range" id="vnZoomSlider" min="100" max="300" value="100" step="1">
           <button type="button" class="vn-zoom-btn" id="vnZoomIn">+</button>
         </div>
-        <p class="vn-crop-hint">This is exactly how it will be framed on the site.</p>
+        <p class="vn-crop-hint" id="vnStep2Note"></p>
         <div class="row">
           <button type="button" class="vn-btn primary" id="vnSaveImage">Save</button>
           ${existingMedia ? "" : '<button type="button" class="vn-btn" id="vnCancelStep2">Choose a different file</button>'}
@@ -266,129 +322,193 @@
     });
 
     let pending = null; // { url, type }
-    let posX = 50, posY = 50, zoom = 1;
-    let heightOverride = null; // set only if the resize handle gets dragged
-
-    // A reference width to translate the modal's (narrower) frame into
-    // the real site's proportions when resizeUnit is "px" or "ratio" —
-    // both of those are meant to describe the destination's ACTUAL
-    // size/shape, not the modal's. "vh" doesn't need this since it's
-    // viewport-relative regardless of any element's width.
-    function frameHeightFromOverride(frame, override) {
-      if (!override) return aspectRatio ? frame.clientWidth / aspectRatio : frame.clientWidth * (9 / 16);
-      if (resizeUnit === "vh") return (parseFloat(override) / 100) * window.innerHeight;
-      if (resizeUnit === "px") return parseFloat(override);
-      if (resizeUnit === "ratio") return frame.clientWidth / parseFloat(override);
-      return frame.clientWidth * (9 / 16);
-    }
+    let saveHandler = null; // set per-media-type below
 
     function showStep2(media) {
       pending = media;
-      const parsed = media.position && /(\d+(\.\d+)?)% (\d+(\.\d+)?)%/.exec(media.position);
-      posX = parsed ? +parsed[1] : 50;
-      posY = parsed ? +parsed[3] : 50;
-      zoom = media.zoom || 1;
-      heightOverride = media.heightOverride || null;
-
       overlay.querySelector("#vnStep1").style.display = "none";
       overlay.querySelector("#vnStep2").style.display = "block";
+      if (media.type === "video") setUpVideoStep(media);
+      else setUpImageCropStep(media);
+    }
 
-      const frame = overlay.querySelector("#vnCropFrame");
-      frame.innerHTML = media.type === "video"
-        ? `<video src="${media.url}" muted loop autoplay playsinline></video>`
-        : `<img src="${media.url}" draggable="false">`;
+    /* ---------- VIDEO: unchanged pan/zoom (a real crop can't be done
+       to a video file in the browser) ---------- */
+    function setUpVideoStep(media) {
+      overlay.querySelector("#vnStep2Hint").textContent = "Drag to reposition, scroll (or use the buttons) to zoom";
+      overlay.querySelector("#vnStep2Note").textContent = "This is exactly how it will be framed on the site.";
+      overlay.querySelector("#vnVideoControls").style.display = "flex";
+      const stage = overlay.querySelector("#vnStep2Stage");
+      stage.innerHTML = `<div class="vn-crop-frame" id="vnCropFrame"></div>`;
+      const frame = stage.querySelector("#vnCropFrame");
+      if (aspectRatio) frame.style.aspectRatio = `${aspectRatio}`;
+      frame.innerHTML = `<video src="${media.url}" muted loop autoplay playsinline></video>`;
 
-      if (resizable) {
-        frame.style.aspectRatio = "";
-        frame.style.height = frameHeightFromOverride(frame, heightOverride) + "px";
-        const handle = overlay.querySelector("#vnResizeHandle");
-        if (handle && !handle.dataset.wired) {
-          wireResizeHandle(frame, handle);
-          handle.dataset.wired = "1";
-        }
-      } else if (aspectRatio) {
-        frame.style.aspectRatio = `${aspectRatio}`;
+      let posX = 50, posY = 50, zoom = 1;
+      function renderTransform() {
+        const v = frame.querySelector("video");
+        if (!v) return;
+        v.style.objectPosition = `${posX}% ${posY}%`;
+        v.style.transform = zoom !== 1 ? `scale(${zoom})` : "";
+        v.style.transformOrigin = `${posX}% ${posY}%`;
+        overlay.querySelector("#vnZoomSlider").value = Math.round(zoom * 100);
       }
-
-      renderTransform();
-      wireCropInteraction(frame);
-    }
-
-    function wireResizeHandle(frame, handle) {
-      let resizing = false, startY = 0, startHeight = 0;
-      const MIN_H = 100, MAX_H = 640;
-      const onDown = (clientY) => { resizing = true; startY = clientY; startHeight = frame.getBoundingClientRect().height; };
-      const onMove = (clientY) => {
-        if (!resizing) return;
-        const newHeight = Math.min(MAX_H, Math.max(MIN_H, startHeight + (clientY - startY)));
-        frame.style.height = newHeight + "px";
-      };
-      const onUp = () => {
-        if (!resizing) return;
-        resizing = false;
-        const h = frame.getBoundingClientRect().height;
-        if (resizeUnit === "vh") heightOverride = ((h / window.innerHeight) * 100).toFixed(1) + "vh";
-        else if (resizeUnit === "px") heightOverride = Math.round(h) + "px";
-        else if (resizeUnit === "ratio") heightOverride = (frame.clientWidth / h).toFixed(4);
-      };
-      handle.addEventListener("mousedown", e => { e.preventDefault(); e.stopPropagation(); onDown(e.clientY); });
-      window.addEventListener("mousemove", e => onMove(e.clientY));
-      window.addEventListener("mouseup", onUp);
-      handle.addEventListener("touchstart", e => { e.stopPropagation(); onDown(e.touches[0].clientY); }, { passive: true });
-      handle.addEventListener("touchmove", e => onMove(e.touches[0].clientY), { passive: true });
-      handle.addEventListener("touchend", onUp);
-    }
-
-    function renderTransform() {
-      const media = overlay.querySelector("#vnCropFrame img, #vnCropFrame video");
-      if (!media) return;
-      media.style.objectPosition = `${posX}% ${posY}%`;
-      media.style.transform = zoom !== 1 ? `scale(${zoom})` : "";
-      media.style.transformOrigin = `${posX}% ${posY}%`;
-      overlay.querySelector("#vnZoomSlider").value = Math.round(zoom * 100);
-    }
-
-    function setZoom(newZoom) {
-      zoom = Math.min(3, Math.max(1, newZoom));
-      renderTransform();
-    }
-
-    function wireCropInteraction(frame) {
+      function setZoom(z) { zoom = Math.min(3, Math.max(1, z)); renderTransform(); }
       let dragging = false, lastX = 0, lastY = 0;
-      const onDown = (clientX, clientY) => { dragging = true; lastX = clientX; lastY = clientY; frame.classList.add("dragging"); };
-      const onMove = (clientX, clientY) => {
+      frame.addEventListener("mousedown", e => { e.preventDefault(); dragging = true; lastX = e.clientX; lastY = e.clientY; frame.classList.add("dragging"); });
+      window.addEventListener("mousemove", e => {
         if (!dragging) return;
         const rect = frame.getBoundingClientRect();
-        const dxPct = ((clientX - lastX) / rect.width) * 100 / zoom;
-        const dyPct = ((clientY - lastY) / rect.height) * 100 / zoom;
-        posX = Math.min(100, Math.max(0, posX - dxPct));
-        posY = Math.min(100, Math.max(0, posY - dyPct));
-        lastX = clientX; lastY = clientY;
+        posX = Math.min(100, Math.max(0, posX - ((e.clientX - lastX) / rect.width) * 100 / zoom));
+        posY = Math.min(100, Math.max(0, posY - ((e.clientY - lastY) / rect.height) * 100 / zoom));
+        lastX = e.clientX; lastY = e.clientY;
         renderTransform();
-      };
-      const onUp = () => { dragging = false; frame.classList.remove("dragging"); };
-
-      frame.addEventListener("mousedown", e => { if (e.target.closest(".vn-resize-handle")) return; e.preventDefault(); onDown(e.clientX, e.clientY); });
-      window.addEventListener("mousemove", e => onMove(e.clientX, e.clientY));
-      window.addEventListener("mouseup", onUp);
-      frame.addEventListener("touchstart", e => { if (e.target.closest(".vn-resize-handle")) return; const t = e.touches[0]; onDown(t.clientX, t.clientY); }, { passive: true });
-      frame.addEventListener("touchmove", e => { const t = e.touches[0]; onMove(t.clientX, t.clientY); }, { passive: true });
-      frame.addEventListener("touchend", onUp);
+      });
+      window.addEventListener("mouseup", () => { dragging = false; frame.classList.remove("dragging"); });
       frame.addEventListener("wheel", e => { e.preventDefault(); setZoom(zoom - e.deltaY * 0.0015); }, { passive: false });
+      overlay.querySelector("#vnZoomIn").onclick = () => setZoom(zoom + 0.2);
+      overlay.querySelector("#vnZoomOut").onclick = () => setZoom(zoom - 0.2);
+      overlay.querySelector("#vnZoomSlider").oninput = e => setZoom(e.target.value / 100);
+      overlay.querySelector("#vnResetCrop").onclick = () => { posX = 50; posY = 50; zoom = 1; renderTransform(); };
+      renderTransform();
+
+      saveHandler = () => onSave({ url: media.url, type: "video", position: `${posX}% ${posY}%`, zoom });
     }
 
-    overlay.querySelector("#vnZoomIn").onclick = () => setZoom(zoom + 0.2);
-    overlay.querySelector("#vnZoomOut").onclick = () => setZoom(zoom - 0.2);
-    overlay.querySelector("#vnZoomSlider").addEventListener("input", e => setZoom(e.target.value / 100));
-    overlay.querySelector("#vnResetCrop").onclick = () => {
-      posX = 50; posY = 50; zoom = 1;
-      if (resizable) {
-        heightOverride = null;
-        const frame = overlay.querySelector("#vnCropFrame");
-        frame.style.height = frameHeightFromOverride(frame, null) + "px";
+    /* ---------- IMAGE: real crop — full photo shown, a resizable
+       selection box on top; saving canvas-crops + uploads the result ---------- */
+    function setUpImageCropStep(media) {
+      overlay.querySelector("#vnStep2Hint").textContent = lockAspect
+        ? "Drag the box to reposition it, or its corners to resize — this spot needs a consistent shape, so the box keeps its proportions."
+        : "Drag the box to reposition it, or drag a corner to resize it to any shape.";
+      overlay.querySelector("#vnStep2Note").textContent = "Saving crops the photo to exactly this selection — a real, smaller file, not just a repositioned view of the original.";
+      overlay.querySelector("#vnVideoControls").style.display = "none";
+      const stage = overlay.querySelector("#vnStep2Stage");
+      stage.innerHTML = `
+        <div class="vn-crop-stage" id="vnCropStage">
+          <img id="vnCropImg" src="${media.url}" draggable="false">
+          <div class="vn-crop-box" id="vnCropBox">
+            <div class="vn-crop-handle" data-handle="nw"></div>
+            <div class="vn-crop-handle" data-handle="ne"></div>
+            <div class="vn-crop-handle" data-handle="sw"></div>
+            <div class="vn-crop-handle" data-handle="se"></div>
+          </div>
+        </div>`;
+      const cropStage = stage.querySelector("#vnCropStage");
+      const cropImg = stage.querySelector("#vnCropImg");
+      const cropBox = stage.querySelector("#vnCropBox");
+      let box = null; // { x, y, w, h } in px, relative to cropStage
+
+      function renderBox() {
+        cropBox.style.left = box.x + "px";
+        cropBox.style.top = box.y + "px";
+        cropBox.style.width = box.w + "px";
+        cropBox.style.height = box.h + "px";
       }
-      renderTransform();
-    };
+
+      function resetBox() {
+        const W = cropStage.clientWidth, H = cropStage.clientHeight;
+        const ratio = aspectRatio || W / H;
+        let w, h;
+        if (W / H > ratio) { h = H * 0.86; w = h * ratio; }
+        else { w = W * 0.86; h = w / ratio; }
+        box = { x: (W - w) / 2, y: (H - h) / 2, w, h };
+        renderBox();
+      }
+
+      const onImgReady = () => { resetBox(); wireBoxDrag(); wireHandles(); };
+      if (cropImg.complete && cropImg.naturalWidth) onImgReady();
+      else cropImg.addEventListener("load", onImgReady, { once: true });
+
+      function wireBoxDrag() {
+        let dragging = false, startX = 0, startY = 0, start = null;
+        const onDown = (x, y) => { dragging = true; startX = x; startY = y; start = { ...box }; };
+        const onMove = (x, y) => {
+          if (!dragging) return;
+          const W = cropStage.clientWidth, H = cropStage.clientHeight;
+          box.x = Math.min(W - box.w, Math.max(0, start.x + (x - startX)));
+          box.y = Math.min(H - box.h, Math.max(0, start.y + (y - startY)));
+          renderBox();
+        };
+        const onUp = () => { dragging = false; };
+        cropBox.addEventListener("mousedown", e => { if (e.target.closest(".vn-crop-handle")) return; e.preventDefault(); onDown(e.clientX, e.clientY); });
+        window.addEventListener("mousemove", e => onMove(e.clientX, e.clientY));
+        window.addEventListener("mouseup", onUp);
+        cropBox.addEventListener("touchstart", e => { if (e.target.closest(".vn-crop-handle")) return; const t = e.touches[0]; onDown(t.clientX, t.clientY); }, { passive: true });
+        cropBox.addEventListener("touchmove", e => { const t = e.touches[0]; onMove(t.clientX, t.clientY); }, { passive: true });
+        cropBox.addEventListener("touchend", onUp);
+      }
+
+      function wireHandles() {
+        const MIN = 40;
+        cropStage.querySelectorAll(".vn-crop-handle").forEach(handle => {
+          const type = handle.dataset.handle; // nw, ne, sw, se
+          let resizing = false, startX = 0, startY = 0, start = null;
+          const onDown = (x, y) => { resizing = true; startX = x; startY = y; start = { ...box }; };
+          const onMove = (x, y) => {
+            if (!resizing) return;
+            const W = cropStage.clientWidth, H = cropStage.clientHeight;
+            const dx = x - startX, dy = y - startY;
+            let { x: bx, y: by, w, h } = start;
+
+            if (lockAspect) {
+              const ratio = aspectRatio || (start.w / start.h);
+              const deltaW = type.includes("e") ? dx : -dx;
+              w = Math.max(MIN, start.w + deltaW);
+              h = w / ratio;
+              if (type.includes("w")) bx = start.x + start.w - w;
+              if (type.includes("n")) by = start.y + start.h - h;
+            } else {
+              if (type.includes("e")) w = Math.max(MIN, start.w + dx);
+              if (type.includes("w")) { w = Math.max(MIN, start.w - dx); bx = start.x + start.w - w; }
+              if (type.includes("s")) h = Math.max(MIN, start.h + dy);
+              if (type.includes("n")) { h = Math.max(MIN, start.h - dy); by = start.y + start.h - h; }
+            }
+
+            bx = Math.max(0, bx); by = Math.max(0, by);
+            if (bx + w > W) w = W - bx;
+            if (by + h > H) h = H - by;
+
+            box = { x: bx, y: by, w, h };
+            renderBox();
+          };
+          const onUp = () => { resizing = false; };
+          handle.addEventListener("mousedown", e => { e.preventDefault(); e.stopPropagation(); onDown(e.clientX, e.clientY); });
+          window.addEventListener("mousemove", e => onMove(e.clientX, e.clientY));
+          window.addEventListener("mouseup", onUp);
+          handle.addEventListener("touchstart", e => { e.stopPropagation(); const t = e.touches[0]; onDown(t.clientX, t.clientY); }, { passive: true });
+          handle.addEventListener("touchmove", e => { const t = e.touches[0]; onMove(t.clientX, t.clientY); }, { passive: true });
+          handle.addEventListener("touchend", onUp);
+        });
+      }
+
+      overlay.querySelector("#vnResetCrop").onclick = () => resetBox();
+
+      saveHandler = async () => {
+        const saveBtn = overlay.querySelector("#vnSaveImage");
+        saveBtn.disabled = true;
+        saveBtn.textContent = "Cropping…";
+        try {
+          const scaleX = cropImg.naturalWidth / cropStage.clientWidth;
+          const scaleY = cropImg.naturalHeight / cropStage.clientHeight;
+          const sx = box.x * scaleX, sy = box.y * scaleY, sw = box.w * scaleX, sh = box.h * scaleY;
+          const canvas = document.createElement("canvas");
+          canvas.width = Math.max(1, Math.round(sw));
+          canvas.height = Math.max(1, Math.round(sh));
+          canvas.getContext("2d").drawImage(cropImg, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+          const blob = await new Promise(resolve => canvas.toBlob(resolve, "image/jpeg", 0.9));
+          const fd = new FormData();
+          fd.append("files", new File([blob], `cropped-${Date.now()}.jpg`, { type: "image/jpeg" }));
+          const r = await adminApi("/media", { method: "POST", body: fd });
+          onSave({ url: r.files[0].url, type: "image" });
+          close();
+        } catch (err) {
+          alert("Couldn't save the crop: " + err.message);
+          saveBtn.disabled = false;
+          saveBtn.textContent = "Save";
+        }
+      };
+    }
 
     async function handleFiles(files) {
       const file = files[0];
@@ -409,31 +529,25 @@
       overlay.querySelector("#vnStep2").style.display = "none";
     });
 
-    overlay.querySelector("#vnSaveImage").onclick = () => {
-      onSave({ url: pending.url, type: pending.type, position: `${posX}% ${posY}%`, zoom, ...(resizable ? { heightOverride } : {}) });
-      close();
-    };
+    // The Save button's actual behavior is assigned per-media-type
+    // above (setUpVideoStep / setUpImageCropStep) since cropping an
+    // image vs. framing a video are genuinely different operations.
+    overlay.querySelector("#vnSaveImage").onclick = () => saveHandler && saveHandler();
 
     // Editing an existing photo's framing — skip straight to the crop step.
     if (existingMedia) showStep2(existingMedia);
   }
 
-  /* Which spots get the height-resize handle, and what unit their
-     underlying CSS actually uses — see openPickCropModal's "resizable"
-     option for why width is never adjustable here (it's always fixed
-     by the surrounding layout) and why product photos / category
-     tiles are deliberately absent (a grid needs every item the same
-     shape, or it looks broken — this is only for one-off spots). */
-  const RESIZE_CONFIG = {
-    hero_home: "vh", hero_maison: "vh",
-    home_editorial_1: "px", home_editorial_2: "px",
-    maison_editorial_1: "px", maison_editorial_2: "px",
-    mega_feature_jewelry: "ratio", mega_feature_maison: "ratio"
-  };
+  /* Category tiles need every item the same shape to look like a
+     tidy grid, so their crop box stays locked to a square. Everything
+     else that goes through data-editable-image (hero banners,
+     editorial photos, menu features) is a one-off spot with nothing
+     else it needs to match, so it gets a genuinely free-shaped crop. */
+  const LOCKED_ASPECT_KEYS = new Set(["category_necklaces", "category_earrings", "category_bracelets", "category_rings"]);
 
   /* Every [data-editable-image] spot (hero banners, editorial photos,
-     mega-menu features) uses the shared modal above, matching its own
-     live aspect ratio and saving straight to Settings. */
+     mega-menu features, category tiles) uses the shared modal above,
+     matching its own live aspect ratio and saving straight to Settings. */
   async function openImageEditor(el) {
     const key = el.dataset.editableImage;
     const rect = el.getBoundingClientRect();
@@ -442,9 +556,8 @@
 
     openPickCropModal({
       aspectRatio: rect.width && rect.height ? rect.width / rect.height : 16 / 9,
+      lockAspect: LOCKED_ASPECT_KEYS.has(key),
       existingMedia,
-      resizable: !!RESIZE_CONFIG[key],
-      resizeUnit: RESIZE_CONFIG[key],
       onSave: async (media) => {
         try {
           await adminApi("/settings", { method: "PUT", body: JSON.stringify({ [key]: media }) });
@@ -544,6 +657,7 @@
         cropBtn.style.cssText = "position:absolute; bottom:3px; left:3px; font-size:.62rem; padding:2px 6px; background:rgba(35,26,18,.8); color:#fff; border:none; cursor:pointer;";
         cropBtn.onclick = () => openPickCropModal({
           aspectRatio: PRODUCT_ASPECT,
+        lockAspect: true,
           existingMedia: photos[i],
           onSave: (media) => { photos[i] = media; renderList(); }
         });
@@ -555,6 +669,7 @@
     overlay.querySelectorAll("#vnLibraryPick div[data-url]").forEach(div => {
       div.onclick = () => openPickCropModal({
         aspectRatio: PRODUCT_ASPECT,
+        lockAspect: true,
         existingMedia: { url: div.dataset.url, type: div.dataset.type },
         onSave: (media) => { photos.push(media); renderList(); }
       });
@@ -573,6 +688,7 @@
           if (!f) return;
           openPickCropModal({
             aspectRatio: PRODUCT_ASPECT,
+        lockAspect: true,
             existingMedia: { url: f.url, type: f.type },
             onSave: (media) => { photos.push(media); renderList(); next(); }
           });

@@ -91,11 +91,34 @@ async function vennusLoadCatalogue() {
     // or keys nothing's been set for yet, keep their placeholder box.
     // Exposed on window so vennus-admin-bar.js can reuse the exact same
     // rendering after a save, instead of a second, possibly-diverging copy.
+    // Hero/editorial/menu-feature images are one-off spots with their
+    // own new-crop workflow (see openPickCropModal's "lockAspect": the
+    // admin bar's real, pixel-level crop replaces the old CSS pan/zoom
+    // trick for these). A genuinely-cropped file should just display
+    // at its own natural size — width:100%, height:auto — rather than
+    // being cover-clipped again into a fixed box, which would partly
+    // undo the crop. Category tiles keep the old cover treatment since
+    // every tile in that grid still needs to match its neighbors.
+    const NATURAL_SIZE_KEYS = new Set([
+      "hero_home", "hero_maison",
+      "home_editorial_1", "home_editorial_2", "maison_editorial_1", "maison_editorial_2",
+      "mega_feature_jewelry", "mega_feature_maison"
+    ]);
+
     window.vennusApplyEditableImage = function (el, media) {
       if (!el || !media || !media.url) return;
+      const key = el.dataset.editableImage;
+      const natural = NATURAL_SIZE_KEYS.has(key);
+      // position/zoom are only meaningful for the old CSS-crop
+      // mechanism (still used for video, and for anything saved
+      // before the real-crop tool existed) — a freshly, genuinely
+      // cropped image simply has neither.
       const position = media.position || "center center";
       const zoom = media.zoom && media.zoom !== 1 ? media.zoom : null;
       const extra = zoom ? ` transform: scale(${zoom}); transform-origin: ${position};` : "";
+      const sizing = natural
+        ? `width:100%; height:auto;`
+        : `width:100%; height:100%; object-fit:cover; object-position:${position};`;
       // The admin bar may have already attached its edit button to this
       // element before this runs (or vice versa) — timing between two
       // independent scripts isn't guaranteed. Preserve the button across
@@ -103,26 +126,9 @@ async function vennusLoadCatalogue() {
       // second silently erase the other's work.
       const pencil = el.querySelector(":scope > .vn-edit-btn");
       el.innerHTML = media.type === "video"
-        ? `<video autoplay muted loop playsinline style="width:100%; height:100%; object-fit:cover; object-position:${position}; display:block;${extra}"><source src="${media.url}"></video>`
-        : `<img src="${media.url}" alt="" style="width:100%; height:100%; object-fit:cover; object-position:${position}; display:block;${extra}">`;
+        ? `<video autoplay muted loop playsinline style="${sizing} display:block;${extra}"><source src="${media.url}"></video>`
+        : `<img src="${media.url}" alt="" style="${sizing} display:block;${extra}">`;
       if (pencil) el.appendChild(pencil);
-
-      // Optional per-instance height (hero/editorial/mega-feature only
-      // — see openPickCropModal's "resizable" option in the admin bar).
-      // The unit is read from the stored string's own suffix rather
-      // than needing a separate field: "vh" -> the .hero section's own
-      // height; "px" -> an editorial photo's min-height; a bare number
-      // -> an aspect-ratio (mega-feature, or anything else that
-      // normally has a fixed one).
-      if (media.heightOverride) {
-        const target = el.matches(".hero .placeholder-block") ? el.closest(".hero") : el;
-        const v = String(media.heightOverride);
-        if (target) {
-          if (v.endsWith("vh")) target.style.height = v;
-          else if (v.endsWith("px")) target.style.minHeight = v;
-          else target.style.aspectRatio = v;
-        }
-      }
     };
     document.querySelectorAll("[data-editable-image]").forEach(el => {
       window.vennusApplyEditableImage(el, s[el.dataset.editableImage]);

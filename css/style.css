@@ -444,7 +444,7 @@ body.hero-page.header-light .site-header:not(.is-solid):not(.menu-open) .hamburg
 }
 
 .mega-feature { display: block; position: relative; min-width: 0; }
-.mega-feature .placeholder-block { aspect-ratio: 4 / 3; min-height: 0; width: 100%; }
+.mega-feature .placeholder-block { min-height: 0; width: 100%; }
 .mega-feature-label {
   position: absolute;
   left: 20px;
@@ -763,16 +763,19 @@ body.hero-page.header-light .site-header:not(.is-solid):not(.menu-open) .hamburg
    ----------------------------------------------------------------- */
 .hero {
   position: relative;
-  height: 86vh;
-  min-height: 560px;
+}
+/* The placeholder/image is now in normal flow (not absolutely
+   positioned) so .hero's own height simply follows the image's real,
+   post-crop size — width:100%, height:auto — instead of a fixed vh
+   value that would just cover-crop it right back to a fixed shape.
+   The text overlay is what's absolutely positioned now, sitting on
+   top of however tall that ends up being. */
+.hero-content {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
   display: flex;
   align-items: flex-end;
-  overflow: hidden;
-}
-.hero .placeholder-block { position: absolute; inset: 0; z-index: 0; }
-.hero-content {
-  position: relative;
-  z-index: 1;
   padding: 0 40px 72px;
   width: 100%;
   color: var(--umber);
@@ -809,9 +812,13 @@ body.hero-page.header-light .site-header:not(.is-solid):not(.menu-open) .hamburg
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 0;
-  align-items: stretch;
+  align-items: center;
 }
-.editorial-split .placeholder-block { min-height: 460px; }
+/* No forced min-height here anymore — a genuinely-cropped photo
+   should show at its own real height (see vennusApplyEditableImage's
+   "natural size" handling), not be stretched or clipped to match a
+   fixed number. The base .placeholder-block rule's min-height still
+   applies as a sensible floor for the empty/no-image-set state. */
 .editorial-copy {
   display: flex;
   flex-direction: column;
