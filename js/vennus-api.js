@@ -131,27 +131,30 @@ async function vennusLoadCatalogue() {
           ? `<video autoplay muted loop playsinline style="${sizing} display:block;${extra}"><source src="${media.url}"></video>`
           : `<img src="${media.url}" alt="" style="${sizing} display:block;${extra}">`;
         if (pencil) el.appendChild(pencil);
+        return el.querySelector("img, video");
       }
 
       if (media.type === "video") { reallyApply(); return; }
 
-      // A file just committed via the admin can take GitHub Pages a
-      // short moment to actually start serving — swapping in the new
-      // <img> immediately risks a brief broken-image flash (and, for a
-      // naturally-sized spot, the whole container collapsing to
-      // whatever a broken image renders at). Preload it first and
-      // retry a few times with a growing delay; only swap once it's
-      // actually confirmed loadable, or give up gracefully after a
-      // few tries rather than leaving the site broken indefinitely.
+      // Apply straight away — this is the fast path, and it's the one
+      // that runs almost every time (the image has been live for a
+      // while and loads normally, same as any other <img> on the
+      // page; there's no reason to make every single page load wait
+      // on a JS-driven preload first just to guard against a rare
+      // case). Only if THIS actual element fails to load — which
+      // really only happens in the few moments right after a fresh
+      // save, while GitHub Pages is still catching up — does a retry
+      // loop kick in, swapping in a fresh attempt each time.
+      const rendered = reallyApply();
+      if (!rendered) return;
       let attempt = 0;
-      const probe = new Image();
-      probe.onload = reallyApply;
-      probe.onerror = () => {
+      rendered.addEventListener("error", function onError() {
         attempt++;
-        if (attempt >= 14) { reallyApply(); return; }
-        setTimeout(() => { probe.src = media.url + (media.url.includes("?") ? "&" : "?") + "retry=" + attempt; }, Math.min(5000, attempt * 800));
-      };
-      probe.src = media.url;
+        if (attempt >= 14) { rendered.removeEventListener("error", onError); return; }
+        setTimeout(() => {
+          rendered.src = media.url + (media.url.includes("?") ? "&" : "?") + "retry=" + attempt;
+        }, Math.min(5000, attempt * 800));
+      });
     };
     document.querySelectorAll("[data-editable-image]").forEach(el => {
       window.vennusApplyEditableImage(el, s[el.dataset.editableImage]);

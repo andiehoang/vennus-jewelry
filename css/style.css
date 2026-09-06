@@ -764,7 +764,7 @@ body.hero-page.header-light .site-header:not(.is-solid):not(.menu-open) .hamburg
 .hero {
   position: relative;
   aspect-ratio: 16 / 9;
-  min-height: 320px;
+  min-height: 160px;
   overflow: hidden;
 }
 /* Reserving the right SHAPE on .hero itself (above) doesn't make its
