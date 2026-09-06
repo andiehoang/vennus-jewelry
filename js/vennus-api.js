@@ -91,16 +91,16 @@ async function vennusLoadCatalogue() {
     // or keys nothing's been set for yet, keep their placeholder box.
     // Exposed on window so vennus-admin-bar.js can reuse the exact same
     // rendering after a save, instead of a second, possibly-diverging copy.
-    // Hero/editorial/menu-feature images are one-off spots with their
-    // own new-crop workflow (see openPickCropModal's "lockAspect": the
-    // admin bar's real, pixel-level crop replaces the old CSS pan/zoom
-    // trick for these). A genuinely-cropped file should just display
-    // at its own natural size — width:100%, height:auto — rather than
-    // being cover-clipped again into a fixed box, which would partly
-    // undo the crop. Category tiles keep the old cover treatment since
-    // every tile in that grid still needs to match its neighbors.
+    //
+    // Hero and category tiles are locked to a fixed shape (21:9 cinematic
+    // for the hero, square for category tiles — see LOCKED_ASPECT in the
+    // admin bar's crop tool), so their container keeps a real CSS
+    // aspect-ratio and the image covers it — matching what a locked crop
+    // already produces, and safely reserving the right amount of space
+    // even before the image has actually loaded. Editorial photos and
+    // menu features are free-shaped, so they display at their own
+    // natural size instead of being cover-clipped into a guessed box.
     const NATURAL_SIZE_KEYS = new Set([
-      "hero_home", "hero_maison",
       "home_editorial_1", "home_editorial_2", "maison_editorial_1", "maison_editorial_2",
       "mega_feature_jewelry", "mega_feature_maison"
     ]);
@@ -119,16 +119,39 @@ async function vennusLoadCatalogue() {
       const sizing = natural
         ? `width:100%; height:auto;`
         : `width:100%; height:100%; object-fit:cover; object-position:${position};`;
-      // The admin bar may have already attached its edit button to this
-      // element before this runs (or vice versa) — timing between two
-      // independent scripts isn't guaranteed. Preserve the button across
-      // the innerHTML replacement rather than letting whichever runs
-      // second silently erase the other's work.
-      const pencil = el.querySelector(":scope > .vn-edit-btn");
-      el.innerHTML = media.type === "video"
-        ? `<video autoplay muted loop playsinline style="${sizing} display:block;${extra}"><source src="${media.url}"></video>`
-        : `<img src="${media.url}" alt="" style="${sizing} display:block;${extra}">`;
-      if (pencil) el.appendChild(pencil);
+
+      function reallyApply() {
+        // The admin bar may have already attached its edit button to
+        // this element before this runs (or vice versa) — timing
+        // between two independent scripts isn't guaranteed. Preserve
+        // the button across the innerHTML replacement rather than
+        // letting whichever runs second silently erase the other's work.
+        const pencil = el.querySelector(":scope > .vn-edit-btn");
+        el.innerHTML = media.type === "video"
+          ? `<video autoplay muted loop playsinline style="${sizing} display:block;${extra}"><source src="${media.url}"></video>`
+          : `<img src="${media.url}" alt="" style="${sizing} display:block;${extra}">`;
+        if (pencil) el.appendChild(pencil);
+      }
+
+      if (media.type === "video") { reallyApply(); return; }
+
+      // A file just committed via the admin can take GitHub Pages a
+      // short moment to actually start serving — swapping in the new
+      // <img> immediately risks a brief broken-image flash (and, for a
+      // naturally-sized spot, the whole container collapsing to
+      // whatever a broken image renders at). Preload it first and
+      // retry a few times with a growing delay; only swap once it's
+      // actually confirmed loadable, or give up gracefully after a
+      // few tries rather than leaving the site broken indefinitely.
+      let attempt = 0;
+      const probe = new Image();
+      probe.onload = reallyApply;
+      probe.onerror = () => {
+        attempt++;
+        if (attempt >= 6) { reallyApply(); return; }
+        setTimeout(() => { probe.src = media.url + (media.url.includes("?") ? "&" : "?") + "retry=" + attempt; }, attempt * 800);
+      };
+      probe.src = media.url;
     };
     document.querySelectorAll("[data-editable-image]").forEach(el => {
       window.vennusApplyEditableImage(el, s[el.dataset.editableImage]);

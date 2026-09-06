@@ -763,13 +763,17 @@ body.hero-page.header-light .site-header:not(.is-solid):not(.menu-open) .hamburg
    ----------------------------------------------------------------- */
 .hero {
   position: relative;
+  aspect-ratio: 21 / 9;
+  min-height: 320px;
+  overflow: hidden;
 }
-/* The placeholder/image is now in normal flow (not absolutely
-   positioned) so .hero's own height simply follows the image's real,
-   post-crop size — width:100%, height:auto — instead of a fixed vh
-   value that would just cover-crop it right back to a fixed shape.
-   The text overlay is what's absolutely positioned now, sitting on
-   top of however tall that ends up being. */
+/* The hero is locked to a fixed cinematic ratio (matching the crop
+   tool's locked box for this spot — see LOCKED_ASPECT in the admin
+   bar), so the container reserves that real shape immediately via
+   CSS, rather than depending on the image having already loaded to
+   know its own height. The image/video itself covers this box
+   exactly, same as any other fixed-shape spot (a category tile, a
+   product photo). */
 .hero-content {
   position: absolute;
   inset: 0;
@@ -1203,7 +1207,6 @@ site-footer, .site-footer { display: block; background: var(--blanc); }
 @media (max-width: 520px) {
   .product-grid { grid-template-columns: repeat(2, 1fr); gap: 18px 12px; }
   h1 { font-size: 2rem; }
-  .hero { height: 72vh; }
   .value-strip { grid-template-columns: 1fr 1fr; }
 }
 

@@ -282,14 +282,10 @@
                         { url, type, position, zoom } as before
      ================================================================= */
   function openPickCropModal({ aspectRatio, lockAspect, existingMedia, onSave }) {
-    let items = [];
-    const loadItems = adminApi("/media").then(r => { items = r; }).catch(() => {});
-
     const { overlay, close } = openModal(`
-      <h3>${existingMedia ? "Adjust framing" : "Choose an image or video"}</h3>
+      <h3 id="vnModalTitle">${existingMedia ? "Adjust framing" : "Choose an image or video"}</h3>
       <div id="vnStep1">
-        <p class="hint">Pick something already uploaded, or upload a new photo or video — drag a file onto the box below, or use "Choose file" to open your computer's file browser.</p>
-        <div class="vn-media-pick" id="vnMediaPick"><p style="font-size:.8rem; grid-column:1/-1;">Loading your library…</p></div>
+        <p class="hint">Drag a photo or video onto the box below, or use "Choose file" to open your computer's file browser.</p>
         <div class="vn-dropzone" id="vnDrop">Drag a photo or video here, or
           <label style="text-decoration:underline; cursor:pointer;">choose a file<input type="file" id="vnFile" accept="image/*,video/*" style="display:none;"></label>
         </div>
@@ -311,21 +307,12 @@
       </div>
     `, {});
 
-    loadItems.then(() => {
-      const pick = overlay.querySelector("#vnMediaPick");
-      pick.innerHTML = items.map(m => `<div data-url="${m.url}" data-type="${m.type}">${
-        m.type === "video" ? `<video src="${m.url}" muted></video>` : `<img src="${m.url}">`
-      }</div>`).join("") || '<p style="font-size:.8rem; grid-column:1/-1;">Nothing uploaded yet — use the box below.</p>';
-      pick.querySelectorAll("div[data-url]").forEach(div => {
-        div.onclick = () => showStep2({ url: div.dataset.url, type: div.dataset.type });
-      });
-    });
-
     let pending = null; // { url, type }
     let saveHandler = null; // set per-media-type below
 
     function showStep2(media) {
       pending = media;
+      overlay.querySelector("#vnModalTitle").textContent = "Adjust framing";
       overlay.querySelector("#vnStep1").style.display = "none";
       overlay.querySelector("#vnStep2").style.display = "block";
       if (media.type === "video") setUpVideoStep(media);
@@ -525,6 +512,7 @@
     wireDropzone(overlay.querySelector("#vnDrop"), handleFiles);
 
     overlay.querySelector("#vnCancelStep2")?.addEventListener("click", () => {
+      overlay.querySelector("#vnModalTitle").textContent = "Choose an image or video";
       overlay.querySelector("#vnStep1").style.display = "block";
       overlay.querySelector("#vnStep2").style.display = "none";
     });
@@ -538,12 +526,19 @@
     if (existingMedia) showStep2(existingMedia);
   }
 
-  /* Category tiles need every item the same shape to look like a
-     tidy grid, so their crop box stays locked to a square. Everything
-     else that goes through data-editable-image (hero banners,
-     editorial photos, menu features) is a one-off spot with nothing
-     else it needs to match, so it gets a genuinely free-shaped crop. */
-  const LOCKED_ASPECT_KEYS = new Set(["category_necklaces", "category_earrings", "category_bracelets", "category_rings"]);
+  /* Spots that always need the SAME shape every time a photo is set,
+     so the crop box is locked to a fixed ratio instead of the live
+     rendered rect (which would just describe whatever's already
+     there, not what's actually required): a category tile needs to
+     match its grid neighbors (square), and the hero is meant to be a
+     consistent, cinematic banner every time — not a different shape
+     each time someone crops a new photo in. Editorial photos and menu
+     features have no such constraint, so those stay a genuinely
+     free-shaped crop, sized off whatever's live on the page right now. */
+  const LOCKED_ASPECT = {
+    category_necklaces: 1, category_earrings: 1, category_bracelets: 1, category_rings: 1,
+    hero_home: 21 / 9, hero_maison: 21 / 9
+  };
 
   /* Every [data-editable-image] spot (hero banners, editorial photos,
      mega-menu features, category tiles) uses the shared modal above,
@@ -555,8 +550,8 @@
     try { existingMedia = (await adminApi("/settings"))[key] || null; } catch {}
 
     openPickCropModal({
-      aspectRatio: rect.width && rect.height ? rect.width / rect.height : 16 / 9,
-      lockAspect: LOCKED_ASPECT_KEYS.has(key),
+      aspectRatio: LOCKED_ASPECT[key] || (rect.width && rect.height ? rect.width / rect.height : 16 / 9),
+      lockAspect: key in LOCKED_ASPECT,
       existingMedia,
       onSave: async (media) => {
         try {
