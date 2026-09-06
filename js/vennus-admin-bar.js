@@ -359,7 +359,28 @@
       overlay.querySelector("#vnResetCrop").onclick = () => { posX = 50; posY = 50; zoom = 1; renderTransform(); };
       renderTransform();
 
-      saveHandler = () => onSave({ url: media.url, type: "video", position: `${posX}% ${posY}%`, zoom });
+      saveHandler = async () => {
+        // A freshly-picked file is only previewed locally so far (see
+        // handleFiles) — video can't be cropped/re-encoded in the
+        // browser the way an image can, so it genuinely needs
+        // uploading now to get a permanent, hosted URL. Something
+        // already saved (existingMedia, re-framing a video already in
+        // place) has no localFile and its url is already permanent.
+        if (!media.localFile) { onSave({ url: media.url, type: "video", position: `${posX}% ${posY}%`, zoom }); return; }
+        const saveBtn = overlay.querySelector("#vnSaveImage");
+        saveBtn.disabled = true;
+        saveBtn.textContent = "Uploading…";
+        try {
+          const fd = new FormData();
+          fd.append("files", media.localFile);
+          const r = await adminApi("/media", { method: "POST", body: fd });
+          onSave({ url: r.files[0].url, type: r.files[0].type, position: `${posX}% ${posY}%`, zoom });
+        } catch (err) {
+          alert("Couldn't upload the video: " + err.message);
+          saveBtn.disabled = false;
+          saveBtn.textContent = "Save";
+        }
+      };
     }
 
     /* ---------- IMAGE: real crop — full photo shown, a resizable
@@ -526,16 +547,15 @@
       };
     }
 
-    async function handleFiles(files) {
+    function handleFiles(files) {
       const file = files[0];
       if (!file) return;
-      const fd = new FormData();
-      fd.append("files", file);
-      try {
-        const r = await adminApi("/media", { method: "POST", body: fd });
-        const f = r.files[0];
-        showStep2({ url: f.url, type: f.type });
-      } catch (err) { alert(err.message); }
+      // Show the file locally straight away — no network round-trip,
+      // so there's nothing to wait on and no propagation delay to hit.
+      // The original is never actually uploaded; only the cropped
+      // result is, once you hit Save.
+      const blobUrl = URL.createObjectURL(file);
+      showStep2({ url: blobUrl, type: file.type.startsWith("video/") ? "video" : "image", localFile: file });
     }
     overlay.querySelector("#vnFile").addEventListener("change", e => handleFiles(e.target.files));
     wireDropzone(overlay.querySelector("#vnDrop"), handleFiles);
