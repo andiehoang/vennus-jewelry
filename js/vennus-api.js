@@ -173,6 +173,20 @@ function vennusWriteCache(patch) {
   try { localStorage.setItem(VENNUS_CACHE_KEY, JSON.stringify({ ...vennusReadCache(), ...patch })); } catch { /* ignore */ }
 }
 
+// The admin bar calls these right after a successful save — a save
+// updates the LIVE page immediately, but that's not the same as the
+// cache: without this, the cache would keep whatever was there before
+// the change until the next full fetch happens to succeed, so a
+// reload right after saving could show the OLD (or empty) cached
+// state for as long as the backend takes to wake up and respond.
+window.vennusUpdateSettingsCache = function (patch) {
+  const cache = vennusReadCache();
+  vennusWriteCache({ settings: { ...(cache.settings || {}), ...patch } });
+};
+window.vennusUpdateProductsCache = function (products) {
+  if (Array.isArray(products)) vennusWriteCache({ products });
+};
+
 async function vennusLoadCatalogue() {
   // Apply whatever was cached from a previous visit RIGHT AWAY, before
   // any network call — the admin backend is a free-tier service that

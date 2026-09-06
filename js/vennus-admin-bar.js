@@ -736,6 +736,7 @@
         try {
           await adminApi("/settings", { method: "PUT", body: JSON.stringify({ [key]: media }) });
           window.vennusApplyEditableImage(el, media);
+          window.vennusUpdateSettingsCache?.({ [key]: media });
         } catch (err) { alert(err.message); }
       }
     });
@@ -889,6 +890,15 @@
           if (existing) existing.outerHTML = m.type === "video"
             ? `<video autoplay muted loop playsinline style="position:absolute; inset:0; width:100%; height:100%; ${mediaStyleAttr(m)}"><source src="${m.url}"></video>`
             : `<img src="${m.url}" alt="" loading="lazy" style="position:absolute; inset:0; width:100%; height:100%; ${mediaStyleAttr(m)}">`;
+        }
+        // Same reasoning as the settings save above: keep the
+        // in-memory catalogue AND its cached copy in sync right away,
+        // so a reload right after changing a product's photos doesn't
+        // show the old ones until the next slow fetch catches up.
+        if (Array.isArray(window.VENNUS_PRODUCTS)) {
+          const p = window.VENNUS_PRODUCTS.find(x => String(x.id) === String(productId));
+          if (p) p.images = photos;
+          window.vennusUpdateProductsCache?.(window.VENNUS_PRODUCTS);
         }
         close();
       } catch (err) { alert(err.message); }
