@@ -1130,35 +1130,15 @@ site-footer, .site-footer { display: block; background: var(--blanc); }
    (the toggling is purely a class main.js adds/removes on click —
    these rules are what give that class meaning, and only at mobile
    widths, so the same markup is a plain open grid on desktop). */
-@media (max-width: 860px) {
-  .footer-col { border-top: 1px solid var(--line-soft); }
-  .footer-col:last-child { border-bottom: 1px solid var(--line-soft); }
-  .footer-col h5 {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 0;
-    padding: 16px 2px;
-    cursor: pointer;
-  }
-  .footer-col h5::after {
-    content: '+';
-    font-family: var(--font-display);
-    font-size: 1.15rem;
-    color: var(--beton);
-  }
-  .footer-col.open h5::after { content: '\2212'; }
-  .footer-col ul {
-    max-height: 0;
-    overflow: hidden;
-    transition: max-height 0.3s var(--ease);
-  }
-  .footer-col.open ul { max-height: 400px; }
-  .footer-col ul li:last-child { padding-bottom: 16px; }
-}
-
 /* -----------------------------------------------------------------
    17. RESPONSIVE
+   Ordered widest to narrowest on purpose: multiple max-width queries
+   can be simultaneously true, and equal-specificity rules resolve by
+   source order, not by which condition is "more specific" — so a
+   later, wider-reaching block can silently win over an earlier,
+   narrower one for the same property. Keeping exactly one block per
+   breakpoint, widest first, means each narrower block's overrides
+   always land last and take effect as intended.
    ----------------------------------------------------------------- */
 @media (max-width: 1080px) {
   .mega-inner { grid-template-columns: 1fr; gap: 32px; }
@@ -1203,12 +1183,58 @@ site-footer, .site-footer { display: block; background: var(--blanc); }
   .info-nav { position: static; display: flex; gap: 28px; overflow-x: auto; padding-bottom: 10px; }
   .footer-columns { grid-template-columns: 1fr; gap: 0; padding-top: var(--gap-md); }
   .footer-brand { margin-bottom: var(--gap-md); }
+  .footer-col { border-top: 1px solid var(--line-soft); }
+  .footer-col:last-child { border-bottom: 1px solid var(--line-soft); }
+  .footer-col h5 {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0;
+    padding: 16px 2px;
+    cursor: pointer;
+  }
+  .footer-col h5::after {
+    content: '+';
+    font-family: var(--font-display);
+    font-size: 1.15rem;
+    color: var(--beton);
+  }
+  .footer-col.open h5::after { content: '\2212'; }
+  .footer-col ul {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s var(--ease);
+  }
+  .footer-col.open ul { max-height: 400px; }
+  .footer-col ul li:last-child { padding-bottom: 16px; }
   /* A row of filter chips scrolls sideways instead of wrapping onto
      several centered lines — same treatment as .info-nav above. */
   .filter-bar { justify-content: flex-start; flex-wrap: nowrap; overflow-x: auto; padding-bottom: 6px; -webkit-overflow-scrolling: touch; }
   .filter-chip { flex-shrink: 0; }
   .cookie-inner { flex-direction: column; align-items: flex-start; }
   .section { padding: var(--gap-lg) 0; }
+  /* PDP mobile sticky Add-to-Bag bar — see its own section further
+     down for what it's for; only the display switch lives here so
+     every breakpoint override for this width stays in one place. */
+  .pdp-sticky-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    background: var(--blanc);
+    border-top: 1px solid var(--line);
+    padding: 12px 20px;
+    padding-bottom: calc(12px + env(safe-area-inset-bottom));
+    box-shadow: 0 -8px 24px rgba(59, 44, 32, 0.1);
+  }
+  .pdp-sticky-bar.show { transform: translateY(0); }
+  .pdp-sticky-info { display: flex; flex-direction: column; min-width: 0; }
+  .pdp-sticky-name {
+    font-size: 0.82rem; color: var(--umber);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .pdp-sticky-price { font-size: 0.78rem; color: var(--beton); }
+  .pdp-sticky-bar .btn { padding: 12px 26px; flex-shrink: 0; white-space: nowrap; }
 }
 
 @media (max-width: 520px) {
@@ -1225,32 +1251,14 @@ site-footer, .site-footer { display: block; background: var(--blanc); }
    pages so the purchase action is always one thumb-reach away. Its
    click just re-triggers the real button (js/main.js), so all the
    actual stock/quantity/option logic stays in one place. Absent on
-   desktop, where the real control is already always in view.
+   desktop, where the real control is already always in view — the
+   position/layout rules that make it usable live in the 860px block
+   above; this is just the base hidden/positioning state.
    ----------------------------------------------------------------- */
-.pdp-sticky-bar { display: none; }
-
-@media (max-width: 860px) {
-  .pdp-sticky-bar {
-    position: fixed; left: 0; right: 0; bottom: 0;
-    z-index: 40;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 14px;
-    background: var(--blanc);
-    border-top: 1px solid var(--line);
-    padding: 12px 20px;
-    padding-bottom: calc(12px + env(safe-area-inset-bottom));
-    box-shadow: 0 -8px 24px rgba(59, 44, 32, 0.1);
-    transform: translateY(100%);
-    transition: transform 0.3s var(--ease);
-  }
-  .pdp-sticky-bar.show { transform: translateY(0); }
-  .pdp-sticky-info { display: flex; flex-direction: column; min-width: 0; }
-  .pdp-sticky-name {
-    font-size: 0.82rem; color: var(--umber);
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  }
-  .pdp-sticky-price { font-size: 0.78rem; color: var(--beton); }
-  .pdp-sticky-bar .btn { padding: 12px 26px; flex-shrink: 0; white-space: nowrap; }
+.pdp-sticky-bar {
+  display: none;
+  position: fixed; left: 0; right: 0; bottom: 0;
+  z-index: 40;
+  transform: translateY(100%);
+  transition: transform 0.3s var(--ease);
 }
