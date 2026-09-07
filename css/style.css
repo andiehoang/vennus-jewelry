@@ -50,10 +50,13 @@
   /* Type */
   --font-display: 'Cormorant Garamond', 'Times New Roman', serif;
   --font-body: 'Jost', 'Helvetica Neue', Arial, sans-serif;
-  /* Product name/price/category specifically — matches Toteme's own
-     typeface exactly (confirmed via their site's @font-face: Manrope,
-     variable weight 200–800). It's free/open-source, so this is the
-     real thing, not a stand-in. */
+  /* Product name/price/category specifically. Toteme's own text
+     actually uses "Toteme Sans" — a custom typeface privately hosted
+     on their own CDN (toteme.com/cdn/shop/...), not something publicly
+     licensed or available via Google Fonts, so it isn't something to
+     link to or copy here. Manrope at weight 300 (matching their own
+     font-weight) is the closest legitimate, freely-licensed stand-in
+     for that same clean, light geometric-sans look. */
   --font-product: 'Manrope', 'Helvetica Neue', Arial, sans-serif;
 
   /* Rhythm */
@@ -970,8 +973,8 @@ body.hero-page.header-light .site-header:not(.is-solid):not(.menu-open) .hamburg
 /* Name + price sit centered below the photo, plain text — no card,
    no overlay — matching Toteme's own product grid exactly. */
 .product-info { text-align: center; }
-.product-name { font-family: var(--font-product); font-size: 0.9rem; font-weight: 400; color: var(--umber); margin-bottom: 4px; }
-.product-price { font-family: var(--font-product); font-size: 0.86rem; color: var(--umber); }
+.product-name { font-family: var(--font-product); font-size: 0.9rem; font-weight: 300; letter-spacing: 0.01em; color: var(--umber); margin-bottom: 4px; }
+.product-price { font-family: var(--font-product); font-size: 0.86rem; font-weight: 300; color: var(--umber); }
 .was { text-decoration: line-through; color: var(--beton); margin-left: 8px; font-size: 0.82rem; }
 
 /* -----------------------------------------------------------------
@@ -990,8 +993,8 @@ body.hero-page.header-light .site-header:not(.is-solid):not(.menu-open) .hamburg
 
 .product-panel { padding-top: 8px; }
 .product-panel .product-category { margin-bottom: 10px; font-family: var(--font-product); }
-.product-panel h1 { font-family: var(--font-product); font-weight: 400; font-size: 1.8rem; margin-bottom: 14px; }
-.product-panel .price { font-family: var(--font-product); font-size: 1.2rem; margin-bottom: 24px; }
+.product-panel h1 { font-family: var(--font-product); font-weight: 300; letter-spacing: 0.01em; font-size: 1.8rem; margin-bottom: 14px; }
+.product-panel .price { font-family: var(--font-product); font-weight: 300; font-size: 1.2rem; margin-bottom: 24px; }
 .product-panel .desc { color: var(--beton); font-size: 0.94rem; margin-bottom: 30px; }
 
 .option-row { margin-bottom: 26px; }
