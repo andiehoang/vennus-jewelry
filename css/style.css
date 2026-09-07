@@ -21,7 +21,7 @@
    17. Responsive
    ================================================================= */
 
-@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,400&family=Jost:wght@300;400;500&family=Work+Sans:wght@300;400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,400&family=Jost:wght@300;400;500&family=Manrope:wght@200..800&display=swap');
 
 /* -----------------------------------------------------------------
    1. DESIGN TOKENS — this is the palette from your Hermès swatch
@@ -50,11 +50,11 @@
   /* Type */
   --font-display: 'Cormorant Garamond', 'Times New Roman', serif;
   --font-body: 'Jost', 'Helvetica Neue', Arial, sans-serif;
-  /* Product name/price/category specifically — a clean, minimal
-     grotesk in the spirit of Toteme's typography. Work Sans is a
-     close, freely-available stand-in; swap it here if you have
-     access to Toteme's actual licensed typeface. */
-  --font-product: 'Work Sans', 'Helvetica Neue', Arial, sans-serif;
+  /* Product name/price/category specifically — matches Toteme's own
+     typeface exactly (confirmed via their site's @font-face: Manrope,
+     variable weight 200–800). It's free/open-source, so this is the
+     real thing, not a stand-in. */
+  --font-product: 'Manrope', 'Helvetica Neue', Arial, sans-serif;
 
   /* Rhythm */
   --container-max: 1400px;
