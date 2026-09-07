@@ -934,14 +934,14 @@ body.hero-page.header-light .site-header:not(.is-solid):not(.menu-open) .hamburg
 .media-slide.active { opacity: 1; z-index: 1; }
 .media-nav {
   position: absolute; top: 50%; transform: translateY(-50%);
-  width: 30px; height: 30px; border-radius: 50%;
-  background: rgba(250, 247, 241, 0.85);
+  width: 32px; height: 32px;
+  background: none; border: none;
   display: flex; align-items: center; justify-content: center;
-  z-index: 3; opacity: 0; transition: opacity 0.2s var(--ease);
+  z-index: 3; opacity: 0; transition: opacity 0.15s ease; cursor: pointer;
 }
-.media-nav svg { width: 15px; height: 15px; stroke: var(--umber); stroke-width: 1.6; fill: none; }
-.media-nav.prev { left: 10px; }
-.media-nav.next { right: 10px; }
+.media-nav svg { width: 16px; height: 16px; stroke: var(--umber); stroke-width: 1.6; fill: none; }
+.media-nav.prev { left: 6px; }
+.media-nav.next { right: 6px; }
 .product-media:hover .media-nav { opacity: 1; }
 /* Touch devices have no hover state to reveal the arrows with — show
    them always there instead, or they'd be permanently invisible. */
