@@ -43,23 +43,29 @@ function productCardHTML(p) {
     ? `${vennusFormatPrice(p.price)} <span class="was">${vennusFormatPrice(p.compareAt)}</span>`
     : vennusFormatPrice(p.price);
 
-  // Real photo/video if one's been uploaded in the admin; placeholder otherwise.
-  const media = (p.images && p.images.length)
-    ? mediaTagHTML(p.images[0], p.name, " position:absolute; inset:0; width:100%; height:100%;")
+  // Up to 4 photos, swipeable — real photos if any are uploaded,
+  // otherwise the usual single placeholder.
+  const photos = (p.images && p.images.length ? p.images.slice(0, 4) : []);
+  const hasMultiple = photos.length > 1;
+  const mediaHTML = photos.length
+    ? photos.map((m, i) => `<div class="media-slide${i === 0 ? " active" : ""}">${mediaTagHTML(m, p.name, " position:absolute; inset:0; width:100%; height:100%;")}</div>`).join("")
     : `<div class="placeholder-block" aria-hidden="true"><span class="placeholder-label">Photo — ${p.name}</span></div>`;
 
   return `
     <div class="product-card" data-category="${p.category}">
-      <a href="product.html?id=${p.id}" class="card-link">
-        <div class="product-media">
-          ${tag}
-          <button type="button" class="wishlist-btn" aria-label="Add ${p.name} to wishlist" data-wishlist>
-            <svg viewBox="0 0 24 24"><path d="M12 20s-7-4.4-9.5-8.8C.8 7.8 2.6 4.5 6 4c2-.3 3.7.8 6 3 2.3-2.2 4-3.3 6-3 3.4.5 5.2 3.8 3.5 7.2C19 15.6 12 20 12 20z" fill="none"/></svg>
-          </button>
-          ${media}
-        </div>
+      <div class="product-media">
+        ${tag}
+        <button type="button" class="wishlist-btn" aria-label="Add ${p.name} to wishlist" data-wishlist>
+          <svg viewBox="0 0 24 24"><path d="M12 20s-7-4.4-9.5-8.8C.8 7.8 2.6 4.5 6 4c2-.3 3.7.8 6 3 2.3-2.2 4-3.3 6-3 3.4.5 5.2 3.8 3.5 7.2C19 15.6 12 20 12 20z" fill="none"/></svg>
+        </button>
+        <div class="media-track">${mediaHTML}</div>
+        ${hasMultiple ? `
+        <button type="button" class="media-nav prev" data-nav="prev" aria-label="Previous photo"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7" fill="none"/></svg></button>
+        <button type="button" class="media-nav next" data-nav="next" aria-label="Next photo"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" fill="none"/></svg></button>` : ""}
+        <a href="product.html?id=${p.id}" class="product-name-pill">${p.name}</a>
+      </div>
+      <a href="product.html?id=${p.id}" class="product-info-link">
         <div class="product-info">
-          <h3>${p.name}</h3>
           <div class="product-category">${p.category.charAt(0).toUpperCase() + p.category.slice(1)}</div>
           <div class="product-price">${priceHTML}</div>
         </div>
@@ -67,6 +73,22 @@ function productCardHTML(p) {
     </div>
   `;
 }
+
+/* ---- Product card image swiper: click the photo, or use the arrow
+   buttons, to step through a product's photos without leaving the
+   grid — same behaviour as Hermès's own category pages. The product
+   name pill is the only part of .product-media that navigates. ---- */
+document.addEventListener("click", (e) => {
+  if (e.target.closest(".wishlist-btn") || e.target.closest(".product-name-pill")) return;
+  const media = e.target.closest(".product-media");
+  if (!media) return;
+  const slides = media.querySelectorAll(".media-slide");
+  if (slides.length < 2) return;
+  const nav = e.target.closest(".media-nav");
+  let idx = [...slides].findIndex(s => s.classList.contains("active"));
+  idx = (nav?.dataset.nav === "prev") ? (idx - 1 + slides.length) % slides.length : (idx + 1) % slides.length;
+  slides.forEach((s, i) => s.classList.toggle("active", i === idx));
+});
 
 /* ---- Wishlist heart toggle (visual only, front-end demo) ---- */
 document.addEventListener("click", (e) => {
