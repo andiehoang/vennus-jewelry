@@ -21,7 +21,7 @@
    17. Responsive
    ================================================================= */
 
-@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,400&family=Jost:wght@300;400;500&family=Manrope:wght@200..800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,400&family=Jost:wght@300;400;500&family=Inter:wght@300;400;500&display=swap');
 
 /* -----------------------------------------------------------------
    1. DESIGN TOKENS — this is the palette from your Hermès swatch
@@ -50,14 +50,14 @@
   /* Type */
   --font-display: 'Cormorant Garamond', 'Times New Roman', serif;
   --font-body: 'Jost', 'Helvetica Neue', Arial, sans-serif;
-  /* Product name/price/category specifically. Toteme's own text
-     actually uses "Toteme Sans" — a custom typeface privately hosted
-     on their own CDN (toteme.com/cdn/shop/...), not something publicly
-     licensed or available via Google Fonts, so it isn't something to
-     link to or copy here. Manrope at weight 300 (matching their own
-     font-weight) is the closest legitimate, freely-licensed stand-in
-     for that same clean, light geometric-sans look. */
-  --font-product: 'Manrope', 'Helvetica Neue', Arial, sans-serif;
+  /* Product name/price/category specifically. Both Toteme ("Toteme
+     Sans") and Celine ("Neue Haas Grotesk Text", pasted from their
+     own CDN) use fonts that are either exclusive/proprietary or a
+     genuine paid commercial typeface (Neue Haas Grotesk is real and
+     well-known, but licensed — Celine's own hosted copy isn't
+     something to link to). Inter is the closest freely-licensed
+     match to that same clean, neutral Helvetica-family grotesque. */
+  --font-product: 'Inter', 'Helvetica Neue', Arial, sans-serif;
 
   /* Rhythm */
   --container-max: 1400px;
@@ -973,8 +973,8 @@ body.hero-page.header-light .site-header:not(.is-solid):not(.menu-open) .hamburg
 /* Name + price sit centered below the photo, plain text — no card,
    no overlay — matching Toteme's own product grid exactly. */
 .product-info { text-align: center; }
-.product-name { font-family: var(--font-product); font-size: 0.9rem; font-weight: 300; letter-spacing: 0.01em; color: var(--umber); margin-bottom: 4px; }
-.product-price { font-family: var(--font-product); font-size: 0.86rem; font-weight: 300; color: var(--umber); }
+.product-name { font-family: var(--font-product); font-size: 0.8rem; font-weight: 300; letter-spacing: 0.01em; color: var(--umber); margin-bottom: 4px; }
+.product-price { font-family: var(--font-product); font-size: 0.76rem; font-weight: 300; color: var(--umber); }
 .was { text-decoration: line-through; color: var(--beton); margin-left: 8px; font-size: 0.82rem; }
 
 /* -----------------------------------------------------------------
