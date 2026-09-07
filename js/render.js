@@ -43,8 +43,10 @@ function productCardHTML(p) {
     ? `${vennusFormatPrice(p.price)} <span class="was">${vennusFormatPrice(p.compareAt)}</span>`
     : vennusFormatPrice(p.price);
 
-  // Up to 4 photos, swipeable — real photos if any are uploaded,
-  // otherwise the usual single placeholder.
+  // Up to 4 photos — hovering the card swaps to the 2nd automatically
+  // (Toteme's own pattern); with 3+, small arrows let you step through
+  // the rest without leaving the grid. Real photos if any are
+  // uploaded, otherwise the usual single placeholder.
   const photos = (p.images && p.images.length ? p.images.slice(0, 4) : []);
   const hasMultiple = photos.length > 1;
   const mediaHTML = photos.length
@@ -53,20 +55,19 @@ function productCardHTML(p) {
 
   return `
     <div class="product-card" data-category="${p.category}">
-      <div class="product-media">
-        ${tag}
-        <button type="button" class="wishlist-btn" aria-label="Add ${p.name} to wishlist" data-wishlist>
-          <svg viewBox="0 0 24 24"><path d="M12 20s-7-4.4-9.5-8.8C.8 7.8 2.6 4.5 6 4c2-.3 3.7.8 6 3 2.3-2.2 4-3.3 6-3 3.4.5 5.2 3.8 3.5 7.2C19 15.6 12 20 12 20z" fill="none"/></svg>
-        </button>
-        <div class="media-track">${mediaHTML}</div>
-        ${hasMultiple ? `
-        <button type="button" class="media-nav prev" data-nav="prev" aria-label="Previous photo"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7" fill="none"/></svg></button>
-        <button type="button" class="media-nav next" data-nav="next" aria-label="Next photo"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" fill="none"/></svg></button>` : ""}
-        <a href="product.html?id=${p.id}" class="product-name-pill">${p.name}</a>
-      </div>
-      <a href="product.html?id=${p.id}" class="product-info-link">
+      <a href="product.html?id=${p.id}" class="card-link">
+        <div class="product-media">
+          ${tag}
+          <button type="button" class="wishlist-btn" aria-label="Add ${p.name} to wishlist" data-wishlist>
+            <svg viewBox="0 0 24 24"><path d="M12 20s-7-4.4-9.5-8.8C.8 7.8 2.6 4.5 6 4c2-.3 3.7.8 6 3 2.3-2.2 4-3.3 6-3 3.4.5 5.2 3.8 3.5 7.2C19 15.6 12 20 12 20z" fill="none"/></svg>
+          </button>
+          <div class="media-track">${mediaHTML}</div>
+          ${hasMultiple ? `
+          <button type="button" class="media-nav prev" data-nav="prev" aria-label="Previous photo"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7" fill="none"/></svg></button>
+          <button type="button" class="media-nav next" data-nav="next" aria-label="Next photo"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" fill="none"/></svg></button>` : ""}
+        </div>
         <div class="product-info">
-          <div class="product-category">${p.category.charAt(0).toUpperCase() + p.category.slice(1)}</div>
+          <div class="product-name">${p.name}</div>
           <div class="product-price">${priceHTML}</div>
         </div>
       </a>
@@ -74,20 +75,40 @@ function productCardHTML(p) {
   `;
 }
 
-/* ---- Product card image swiper: click the photo, or use the arrow
-   buttons, to step through a product's photos without leaving the
-   grid — same behaviour as Hermès's own category pages. The product
-   name pill is the only part of .product-media that navigates. ---- */
-document.addEventListener("click", (e) => {
-  if (e.target.closest(".wishlist-btn") || e.target.closest(".product-name-pill")) return;
-  const media = e.target.closest(".product-media");
-  if (!media) return;
+/* ---- Product card image swiper ----
+   Hovering the card previews the 2nd photo automatically, same as
+   Toteme — the mouse never has to leave the image. With 3+ photos,
+   arrow buttons (visible on hover, always visible on touch) step
+   through the rest. Clicking anywhere on the card — image included —
+   just follows the card's own link to the product page; only the
+   arrow buttons intercept the click, to step through photos instead
+   of navigating away. */
+document.addEventListener("mouseenter", (e) => {
+  const media = e.target.closest?.(".product-media");
+  if (!media || media.dataset.hovering) return;
   const slides = media.querySelectorAll(".media-slide");
   if (slides.length < 2) return;
+  media.dataset.hovering = "1";
+  slides.forEach((s, i) => s.classList.toggle("active", i === 1));
+}, true);
+document.addEventListener("mouseleave", (e) => {
+  const media = e.target.closest?.(".product-media");
+  if (!media) return;
+  delete media.dataset.hovering;
+  const slides = media.querySelectorAll(".media-slide");
+  slides.forEach((s, i) => s.classList.toggle("active", i === 0));
+}, true);
+document.addEventListener("click", (e) => {
   const nav = e.target.closest(".media-nav");
+  if (!nav) return;
+  e.preventDefault();
+  e.stopPropagation();
+  const media = nav.closest(".product-media");
+  const slides = media.querySelectorAll(".media-slide");
   let idx = [...slides].findIndex(s => s.classList.contains("active"));
-  idx = (nav?.dataset.nav === "prev") ? (idx - 1 + slides.length) % slides.length : (idx + 1) % slides.length;
+  idx = (nav.dataset.nav === "prev") ? (idx - 1 + slides.length) % slides.length : (idx + 1) % slides.length;
   slides.forEach((s, i) => s.classList.toggle("active", i === idx));
+  media.dataset.hovering = "1"; // so mouseleave still resets correctly
 });
 
 /* ---- Wishlist heart toggle (visual only, front-end demo) ---- */

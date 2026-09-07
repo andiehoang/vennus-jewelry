@@ -917,16 +917,17 @@ body.hero-page.header-light .site-header:not(.is-solid):not(.menu-open) .hamburg
 }
 
 .product-card { position: relative; }
+.product-card a.card-link { display: block; }
 .product-media {
   position: relative;
   aspect-ratio: 4 / 5;
   margin-bottom: 16px;
   overflow: hidden;
-  cursor: pointer;
+  background: var(--craie);
 }
 .product-media .placeholder-block { position: absolute; inset: 0; min-height: 0; }
 .media-track { position: absolute; inset: 0; }
-.media-slide { position: absolute; inset: 0; opacity: 0; transition: opacity 0.25s var(--ease); }
+.media-slide { position: absolute; inset: 0; opacity: 0; transition: opacity 0.3s var(--ease); }
 .media-slide.active { opacity: 1; z-index: 1; }
 .media-nav {
   position: absolute; top: 50%; transform: translateY(-50%);
@@ -944,15 +945,6 @@ body.hero-page.header-light .site-header:not(.is-solid):not(.menu-open) .hamburg
 @media (hover: none) {
   .media-nav { opacity: 1; }
 }
-.product-name-pill {
-  position: absolute; left: 10px; bottom: 10px; z-index: 3;
-  background: rgba(35, 26, 18, 0.82); color: var(--blanc);
-  font-family: var(--font-product);
-  font-size: 0.78rem; padding: 8px 14px;
-  max-width: calc(100% - 20px);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.product-info-link { display: block; }
 .product-tag {
   position: absolute;
   top: 12px; left: 12px;
@@ -975,8 +967,11 @@ body.hero-page.header-light .site-header:not(.is-solid):not(.menu-open) .hamburg
 .wishlist-btn svg { width: 17px; height: 17px; stroke: var(--umber); fill: none; }
 .wishlist-btn.active svg { fill: var(--blush); stroke: var(--chai); }
 
-.product-category { font-size: 0.76rem; color: var(--beton); margin-bottom: 6px; font-family: var(--font-product); }
-.product-price { font-size: 0.9rem; font-family: var(--font-product); }
+/* Name + price sit centered below the photo, plain text — no card,
+   no overlay — matching Toteme's own product grid exactly. */
+.product-info { text-align: center; }
+.product-name { font-family: var(--font-product); font-size: 0.9rem; font-weight: 400; color: var(--umber); margin-bottom: 4px; }
+.product-price { font-family: var(--font-product); font-size: 0.86rem; color: var(--umber); }
 .was { text-decoration: line-through; color: var(--beton); margin-left: 8px; font-size: 0.82rem; }
 
 /* -----------------------------------------------------------------
